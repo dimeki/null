@@ -1,0 +1,30 @@
+# Template for Fly.io (https://fly.io). Change `app` to a name nobody else uses, then from
+# this folder:  fly launch --copy-config --no-deploy   and   fly deploy
+#
+# The relay keeps rooms in memory, so it must run as exactly ONE machine:
+# after deploying, run  fly scale count 1  and leave auto-stop off.
+app = "change-me-ytmusic-party"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8787"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

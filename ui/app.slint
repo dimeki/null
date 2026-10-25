@@ -1,0 +1,1989 @@
+import { Palette } from "std-widgets.slint";
+
+export struct TrackItem {
+    id: string,
+    title: string,
+    channel: string,
+    duration: string,
+    thumb: image,
+}
+
+export struct LyricLine {
+    text: string,
+    time: float,
+}
+
+export struct PartyMember {
+    name: string,
+    initial: string,
+    /// "Host", or how a guest is keeping up ("In sync", "Catching up…")
+    tag: string,
+}
+
+export global Theme {
+    /// Performance saving: no animations, no covers
+    in-out property <bool> perf;
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    out property <color> bg: dark ? #1c1c1e : #ffffff;
+    out property <color> surface: dark ? #262629 : #f5f5f3;
+    out property <color> border: dark ? #3a3a3f : #e3e3df;
+    out property <color> border-strong: dark ? #55555c : #c9c9c3;
+    out property <color> hover: dark ? #ffffff14 : #0000000d;
+    out property <color> text: dark ? #f2f2f0 : #1a1a18;
+    out property <color> text2: dark ? #a9a9a3 : #66665f;
+    out property <color> text3: dark ? #78786f : #9a9a92;
+    out property <color> accent: dark ? #7ab2ff : #2b6de0;
+    out property <color> accent-bg: dark ? #25395a : #e4edfc;
+    out property <color> accent-fill: dark ? #3b7be8 : #2b6de0;
+    out property <color> danger: dark ? #ff8a80 : #c92a2a;
+    out property <color> success: dark ? #7fd89b : #1f8a4c;
+    out property <color> success-bg: dark ? #1f3a2a : #e1f3e8;
+    out property <duration> fade: perf ? 0ms : 120ms;
+}
+
+/// The tooltip currently shown; rows and buttons fill it in, the window draws it on top of everything
+export global TipState {
+    in-out property <string> text;
+    in-out property <length> x;
+    in-out property <length> y;
+    in-out property <bool> above: true;
+    in-out property <bool> shown;
+}
+
+global Glyphs {
+    out property <string> play: "M8 5v14l11-7z";
+    out property <string> pause: "M6 5h4v14H6zM14 5h4v14h-4z";
+    out property <string> prev: "M6 6h2v12H6zM9.5 12 18 18V6z";
+    out property <string> next: "M16 6h2v12h-2zM14.5 12 6 18V6z";
+    out property <string> shuffle: "M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z";
+    out property <string> repeat: "M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z";
+    out property <string> search: "M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z";
+    out property <string> plus: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z";
+    out property <string> close: "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z";
+    out property <string> volume: "M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02z";
+    out property <string> music: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z";
+    out property <string> heart: "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
+    out property <string> settings: "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z";
+    out property <string> refresh: "M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z";
+    out property <string> trash: "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z";
+    out property <string> download: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z";
+}
+
+component Icon inherits Path {
+    in property <string> glyph;
+    in property <color> tint: Theme.text;
+    viewbox-width: 24;
+    viewbox-height: 24;
+    commands: root.glyph;
+    fill: root.tint;
+}
+
+/// Shows a tooltip after the mouse has rested on the parent for a moment.
+/// Place it inside the element to describe, at the point the tooltip should point to.
+component HoverTip inherits Rectangle {
+    in property <bool> hovering;
+    in property <string> text;
+    in property <duration> delay: 500ms;
+    in property <bool> above: true;
+    /// Set by the parent on click so the tooltip doesn't pop up right after the click
+    in-out property <bool> fired;
+    width: 0px;
+    height: 0px;
+    Timer {
+        interval: root.delay;
+        running: root.hovering && !root.fired && root.text != "";
+        triggered => {
+            root.fired = true;
+            TipState.text = root.text;
+            TipState.x = root.absolute-position.x;
+            TipState.y = root.absolute-position.y;
+            TipState.above = root.above;
+            TipState.shown = true;
+        }
+    }
+    changed hovering => {
+        if (!root.hovering) {
+            root.fired = false;
+            TipState.shown = false;
+        }
+    }
+}
+
+component IconButton inherits Rectangle {
+    in property <string> glyph;
+    in property <length> size: 36px;
+    in property <color> tint: Theme.text2;
+    /// Lit in the accent colour (shuffle or repeat switched on)
+    in property <bool> on: false;
+    in property <bool> solid: false;
+    in property <string> tip;
+    in property <bool> tip-below: false;
+    /// Switched off while following a party host
+    in property <bool> enabled: true;
+    callback clicked;
+    opacity: root.enabled ? 1 : 0.35;
+    min-width: root.size;
+    max-width: root.size;
+    preferred-width: root.size;
+    min-height: root.size;
+    max-height: root.size;
+    preferred-height: root.size;
+    border-radius: root.size / 2;
+    border-width: (ta.has-hover && !root.solid) ? 1px : 0px;
+    border-color: Theme.border-strong;
+    background: root.solid ? (ta.has-hover ? Theme.text.with-alpha(0.82) : Theme.text) : (ta.has-hover ? Theme.hover : transparent);
+    animate background { duration: Theme.fade; }
+    Icon {
+        glyph: root.glyph;
+        tint: root.solid ? Theme.bg : (root.on ? Theme.accent : (ta.has-hover ? Theme.text : root.tint));
+        width: root.size * 0.56;
+        height: root.size * 0.56;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    btn-tip := HoverTip {
+        x: parent.width / 2;
+        y: root.tip-below ? parent.height : 0px;
+        above: !root.tip-below;
+        hovering: ta.has-hover;
+        text: root.tip;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? MouseCursor.pointer : MouseCursor.not-allowed;
+        clicked => {
+            TipState.shown = false;
+            btn-tip.fired = true;
+            root.clicked();
+        }
+    }
+}
+
+component TabButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked;
+    min-width: lbl.preferred-width;
+    max-width: lbl.preferred-width;
+    lbl := Text {
+        text: root.label;
+        font-size: 14px;
+        font-weight: root.active ? 500 : 400;
+        color: (root.active || ta.has-hover) ? Theme.text : Theme.text2;
+        vertical-alignment: center;
+    }
+    Rectangle {
+        y: parent.height - 2px;
+        height: 2px;
+        background: root.active ? Theme.accent : (ta.has-hover ? Theme.border-strong : transparent);
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component TextButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> primary: false;
+    /// Red text, for actions like ending or leaving
+    in property <bool> danger: false;
+    callback clicked;
+    min-width: t.preferred-width + 24px;
+    max-width: t.preferred-width + 24px;
+    height: 30px;
+    border-radius: 6px;
+    border-width: root.primary ? 0px : 1px;
+    border-color: ta.has-hover ? Theme.text3 : Theme.border-strong;
+    background: root.primary ? (ta.has-hover ? Theme.accent-fill.with-alpha(0.85) : Theme.accent-fill) : (ta.has-hover ? Theme.hover : transparent);
+    animate background { duration: Theme.fade; }
+    t := Text {
+        text: root.label;
+        font-size: 12px;
+        font-weight: 500;
+        color: root.primary ? #ffffff : (root.danger ? Theme.danger : Theme.text);
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component TextField inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    callback edited(string);
+    callback accepted(string);
+    height: 34px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : (hover-ta.has-hover ? Theme.border-strong : Theme.border);
+    background: Theme.surface;
+    hover-ta := TouchArea {
+        mouse-cursor: MouseCursor.text;
+    }
+    if root.text == "": Text {
+        text: root.placeholder;
+        color: Theme.text3;
+        font-size: 13px;
+        x: 12px;
+        y: (parent.height - self.height) / 2;
+    }
+    input := TextInput {
+        x: 12px;
+        y: 0px;
+        width: parent.width - 24px;
+        height: parent.height;
+        vertical-alignment: center;
+        font-size: 13px;
+        color: Theme.text;
+        edited => {
+            root.edited(self.text);
+        }
+        accepted => {
+            root.accepted(self.text);
+        }
+    }
+}
+
+/// A bordered panel; give it a height and put content inside
+component Card inherits Rectangle {
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: card-ta.has-hover ? Theme.border-strong : Theme.border;
+    card-ta := TouchArea { }
+    VerticalLayout {
+        padding: 14px;
+        spacing: 6px;
+        alignment: start;
+        @children
+    }
+}
+
+/// Small clickable text such as "Clear" or "Sign out"
+component TextLink inherits Rectangle {
+    in property <string> label;
+    callback clicked;
+    min-width: t.preferred-width;
+    max-width: t.preferred-width;
+    t := Text {
+        text: root.label;
+        font-size: 12px;
+        color: ta.has-hover ? Theme.text : Theme.text2;
+        vertical-alignment: center;
+    }
+    // Slint has no text underline, so draw one
+    Rectangle {
+        visible: ta.has-hover;
+        x: 0px;
+        y: (parent.height + t.preferred-height) / 2;
+        width: t.preferred-width;
+        height: 1px;
+        background: Theme.text;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component Toggle inherits Rectangle {
+    in-out property <bool> checked;
+    callback toggled(bool);
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 24px;
+    max-height: 24px;
+    // hover ring, drawn outside the switch so it can't shift the knob
+    Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: self.height / 2;
+        border-width: 3px;
+        border-color: ta.has-hover ? Theme.accent-bg : transparent;
+    }
+    Rectangle {
+        border-radius: self.height / 2;
+        background: root.checked ? Theme.accent-fill : Theme.border-strong;
+        animate background { duration: Theme.fade; }
+        // equal 3px margins at both ends
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            background: #ffffff;
+            y: (parent.height - self.height) / 2;
+            x: root.checked ? parent.width - self.width - 3px : 3px;
+            animate x { duration: Theme.fade; }
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+}
+
+/// Scrolling list with a draggable scrollbar that grows when hovered
+component ScrollList inherits Rectangle {
+    property <bool> scrollable: fl.content-height > fl.height + 1px;
+    property <length> thumb-h: Math.max(28px, fl.height * fl.height / Math.max(fl.content-height, 1px));
+    /// Scrolls so the given content position is in the middle of the view
+    public function scroll-center(y: length) {
+        fl.content-y = -Math.max(0px, Math.min(y - fl.height / 2, fl.content-height - fl.height));
+    }
+    function drag-to(mouse-y: length) {
+        if (root.scrollable) {
+            fl.content-y = -Math.max(0.0, Math.min(1.0, (mouse-y - root.thumb-h / 2) / (root.height - root.thumb-h))) * (fl.content-height - fl.height);
+        }
+    }
+    fl := Flickable {
+        VerticalLayout {
+            padding-right: 12px;
+            @children
+        }
+    }
+    Rectangle {
+        visible: root.scrollable;
+        width: (bar.has-hover || bar.pressed) ? 8px : 5px;
+        height: root.thumb-h;
+        x: parent.width - self.width - 2px;
+        y: root.scrollable ? (-fl.content-y / (fl.content-height - fl.height)) * (parent.height - self.height) : 0px;
+        border-radius: self.width / 2;
+        background: (bar.has-hover || bar.pressed) ? Theme.text3 : Theme.border-strong;
+        animate width { duration: Theme.fade; }
+    }
+    bar := TouchArea {
+        x: parent.width - 14px;
+        width: 14px;
+        height: parent.height;
+        mouse-cursor: pointer;
+        enabled: root.scrollable;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down) {
+                root.drag-to(self.mouse-y);
+            }
+        }
+        moved => {
+            if (self.pressed) {
+                root.drag-to(self.mouse-y);
+            }
+        }
+    }
+}
+
+/// Seek and volume bar: thickens, turns blue, shows a handle and a value bubble on hover
+component Scrub inherits Rectangle {
+    in property <float> value;
+    /// Text for the bubble; the parent builds it from `hover-fraction`
+    in property <string> bubble;
+    /// Report the value continuously while dragging (volume) instead of on release (seek)
+    in property <bool> live: false;
+    /// Switched off while following a party host
+    in property <bool> enabled: true;
+    out property <float> hover-fraction: root.frac(ta.mouse-x);
+    callback committed(float);
+    opacity: root.enabled ? 1 : 0.45;
+    property <bool> active: ta.has-hover || ta.pressed;
+    property <float> shown: ta.pressed ? root.frac(ta.mouse-x) : root.value;
+    height: 22px;
+    pure function frac(x: length) -> float {
+        return Math.max(0.0, Math.min(1.0, x / root.width));
+    }
+    track := Rectangle {
+        y: (parent.height - self.height) / 2;
+        height: root.active ? 6px : 4px;
+        border-radius: self.height / 2;
+        background: Theme.border-strong;
+        animate height { duration: Theme.fade; }
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            height: parent.height;
+            width: parent.width * root.shown;
+            border-radius: parent.border-radius;
+            background: root.active ? Theme.accent : Theme.text2;
+            animate background { duration: Theme.fade; }
+        }
+    }
+    Rectangle {
+        visible: root.active;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        background: Theme.text;
+        x: root.width * root.shown - 6px;
+        y: (parent.height - 12px) / 2;
+    }
+    if root.active && root.bubble != "": Rectangle {
+        width: bt.preferred-width + 14px;
+        height: 20px;
+        x: Math.min(Math.max(ta.mouse-x - self.width / 2, -30px), root.width - self.width + 30px);
+        y: -26px;
+        border-radius: 4px;
+        background: Theme.text;
+        bt := Text {
+            text: root.bubble;
+            color: Theme.bg;
+            font-size: 11px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? MouseCursor.pointer : MouseCursor.not-allowed;
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down && root.live) {
+                root.committed(root.frac(self.mouse-x));
+            }
+            if (e.kind == PointerEventKind.up && !root.live && e.button == PointerEventButton.left) {
+                root.committed(root.frac(self.mouse-x));
+            }
+        }
+        moved => {
+            if (self.pressed && root.live) {
+                root.committed(root.frac(self.mouse-x));
+            }
+        }
+    }
+}
+
+component TrackRow inherits Rectangle {
+    in property <TrackItem> item;
+    in property <bool> current: false;
+    in property <string> action-glyph;
+    in property <string> action-tip;
+    /// Show a play icon over the cover while hovered (rows that start playback)
+    in property <bool> playable: true;
+    callback activated;
+    callback action;
+    /// The mouse has rested on this row, so it is probably about to be played
+    callback hover-intent;
+    property <bool> intent-sent;
+    property <bool> hovering: row-ta.has-hover;
+    property <bool> liked: root.item.id == "LM";
+    height: 48px;
+    border-radius: 8px;
+    background: root.current ? Theme.accent-bg : (row-ta.has-hover ? Theme.hover : transparent);
+    animate background { duration: Theme.fade; }
+    row-ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            TipState.shown = false;
+            row-tip.fired = true;
+            root.activated();
+        }
+    }
+    Timer {
+        interval: 400ms;
+        running: root.hovering && !root.intent-sent;
+        triggered => {
+            root.intent-sent = true;
+            root.hover-intent();
+        }
+    }
+    changed hovering => {
+        if (!root.hovering) {
+            root.intent-sent = false;
+        }
+    }
+    row-tip := HoverTip {
+        x: 56px;
+        y: parent.height;
+        above: false;
+        delay: 700ms;
+        hovering: root.hovering;
+        text: root.item.title + "\n" + root.item.channel;
+    }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 6px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                min-width: 36px;
+                max-width: 36px;
+                min-height: 36px;
+                max-height: 36px;
+                border-radius: 4px;
+                background: root.liked ? Theme.danger.with-alpha(0.18) : Theme.border;
+                clip: true;
+                if !root.liked && root.item.thumb.width > 0 && !Theme.perf: Image {
+                    source: root.item.thumb;
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if root.liked: Icon {
+                    glyph: Glyphs.heart;
+                    tint: Theme.danger;
+                    width: 18px;
+                    height: 18px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+                if !root.liked && (root.item.thumb.width == 0 || Theme.perf): Icon {
+                    glyph: Glyphs.music;
+                    tint: Theme.text3;
+                    width: 16px;
+                    height: 16px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+                Rectangle {
+                    background: #00000099;
+                    opacity: (root.playable && root.hovering) ? 1 : 0;
+                    animate opacity { duration: Theme.fade; }
+                    Icon {
+                        glyph: Glyphs.play;
+                        tint: #ffffff;
+                        width: 16px;
+                        height: 16px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.item.title;
+                color: root.current ? Theme.accent : Theme.text;
+                font-size: 13px;
+                overflow: elide;
+            }
+            Text {
+                text: root.item.channel;
+                color: Theme.text2;
+                font-size: 12px;
+                overflow: elide;
+            }
+        }
+        Text {
+            text: root.item.duration;
+            color: Theme.text3;
+            font-size: 12px;
+            vertical-alignment: center;
+        }
+        if root.action-glyph != "": VerticalLayout {
+            alignment: center;
+            IconButton {
+                glyph: root.action-glyph;
+                size: 30px;
+                tip: root.action-tip;
+                clicked => {
+                    root.action();
+                }
+            }
+        }
+    }
+}
+
+component LyricRow inherits Rectangle {
+    in property <LyricLine> line;
+    in property <bool> current;
+    /// Synced lyrics can be clicked to jump to that line
+    in property <bool> seekable;
+    callback activated;
+    height: 36px;
+    border-radius: 8px;
+    background: (root.seekable && ta.has-hover) ? Theme.hover : transparent;
+    Text {
+        text: root.line.text;
+        color: root.current ? Theme.text : ((root.seekable && ta.has-hover) ? Theme.text : Theme.text3);
+        font-size: root.current ? 17px : 15px;
+        font-weight: root.current ? 500 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    ta := TouchArea {
+        enabled: root.seekable && root.line.text != "";
+        mouse-cursor: pointer;
+        clicked => {
+            root.activated();
+        }
+    }
+}
+
+/// Hosts the embedded browser used to sign in to Google
+export component LoginWindow inherits Window {
+    title: "Sign in to YouTube Music";
+    icon: @image-url("../assets/icon.png");
+    background: Theme.bg;
+    min-width: 480px;
+    max-width: 480px;
+    preferred-width: 480px;
+    min-height: 720px;
+    max-height: 720px;
+    preferred-height: 720px;
+}
+
+export component MainWindow inherits Window {
+    title: "ytmusic-lite";
+    icon: @image-url("../assets/icon.png");
+    min-width: 760px;
+    min-height: 460px;
+    preferred-width: 980px;
+    preferred-height: 620px;
+    background: Theme.bg;
+    default-font-size: 13px;
+
+    in-out property <string> query;
+    in property <[TrackItem]> results;
+    in property <[TrackItem]> queue;
+    in property <int> current-index: -1;
+    in property <bool> searching;
+    in property <string> search-note;
+    in property <string> now-title: "Nothing playing";
+    in property <string> now-detail;
+    in property <image> now-cover;
+    in property <string> pos-text: "0:00";
+    in property <string> dur-text: "0:00";
+    in property <float> duration-secs;
+    in property <float> progress;
+    in property <bool> active;
+    in property <bool> paused;
+    in property <bool> loading;
+    in property <bool> shuffle;
+    in property <int> repeat-mode;
+    in-out property <float> volume: 0.8;
+
+    // 0 = search, 1 = library, 2 = lyrics
+    in-out property <int> tab;
+    in-out property <bool> settings-open;
+    in property <bool> signed-in;
+    in property <bool> signing-in;
+    in property <string> auth-note;
+    in-out property <string> signin-input;
+    in property <[TrackItem]> playlists;
+    in property <bool> library-loading;
+    in property <string> library-note;
+    in-out property <bool> in-playlist;
+    in property <string> playlist-title;
+    in property <[TrackItem]> playlist-tracks;
+    in property <bool> playlist-loading;
+    in property <string> playlist-note;
+
+    in property <[LyricLine]> lyrics-lines;
+    in property <bool> lyrics-synced;
+    in property <int> lyrics-current: -1;
+    in property <string> lyrics-source;
+    in property <bool> lyrics-loading;
+    in property <string> lyrics-note;
+
+    in-out property <bool> perf-mode;
+    in property <string> cache-text: "Calculating…";
+    in property <string> ytdlp-version;
+    in property <bool> ytdlp-updating;
+    in property <string> ytdlp-note;
+
+    // listening party: 0 = none, 1 = hosting, 2 = following a host
+    in property <int> party-mode;
+    in property <bool> party-connecting;
+    in property <string> party-room;
+    in property <string> party-host-name;
+    in property <[PartyMember]> party-members;
+    in property <string> party-note;
+    in property <string> party-sync;
+    // updates
+    in property <string> app-version;
+    in property <bool> update-available;
+    in property <string> update-version;
+    in property <string> update-notes;
+    /// Where the download link leads, shown next to the button
+    in property <string> update-host;
+    in property <bool> update-checking;
+    in property <string> update-note;
+    in-out property <bool> auto-update-check: true;
+    property <bool> update-dismissed;
+    callback check-update();
+    callback open-update();
+    callback set-auto-update(bool);
+
+    in-out property <string> party-server;
+    /// Parties have a server to use (typed in Settings, or built into the app)
+    in property <bool> party-server-ready;
+    /// The app ships with a server address, so Settings can leave the field empty
+    in property <bool> party-server-built-in;
+    in-out property <string> display-name;
+    in-out property <string> party-code-input;
+    /// Guests follow the host, so playback controls are switched off for them
+    in property <bool> controls-locked;
+
+    callback copy-text(string);
+    callback party-start();
+    callback party-join(string);
+    callback party-leave();
+    callback party-server-edited(string);
+    callback display-name-edited(string);
+    callback prefetch-result(int);
+    callback prefetch-playlist-track(int);
+    callback prefetch-queue(int);
+    callback open-library();
+    callback refresh-library();
+    callback open-playlist(int);
+    callback play-playlist-track(int);
+    callback add-playlist-track(int);
+    callback play-all();
+    callback add-all();
+    callback sign-in(string);
+    callback sign-in-google();
+    callback sign-out();
+    callback search(string);
+    callback play-result(int);
+    callback add-result(int);
+    callback play-queue(int);
+    callback remove-queue(int);
+    callback clear-queue();
+    callback toggle-pause();
+    callback next();
+    callback prev();
+    callback seek(float);
+    callback set-volume(float);
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    /// Which view is showing: 0 search, 1 library, 2 lyrics, -1 settings
+    callback view-changed(int);
+    callback set-perf(bool);
+    callback clear-cache();
+    callback update-ytdlp();
+    callback seek-lyric(float);
+
+    pure function clock(secs: float) -> string {
+        return "\{Math.floor(secs / 60)}:\{Math.mod(Math.floor(secs), 60) < 10 ? "0" : ""}\{Math.mod(Math.floor(secs), 60)}";
+    }
+
+    VerticalLayout {
+        HorizontalLayout {
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+                horizontal-stretch: 1;
+                HorizontalLayout {
+                    spacing: 18px;
+                    height: 28px;
+                    TabButton {
+                        label: "Search";
+                        active: root.tab == 0 && !root.settings-open;
+                        clicked => {
+                            root.tab = 0;
+                            root.settings-open = false;
+                            root.view-changed(0);
+                        }
+                    }
+                    TabButton {
+                        label: "Library";
+                        active: root.tab == 1 && !root.settings-open;
+                        clicked => {
+                            root.tab = 1;
+                            root.settings-open = false;
+                            root.view-changed(1);
+                            root.open-library();
+                        }
+                    }
+                    TabButton {
+                        label: "Lyrics";
+                        active: root.tab == 2 && !root.settings-open;
+                        clicked => {
+                            root.tab = 2;
+                            root.settings-open = false;
+                            root.view-changed(2);
+                        }
+                    }
+                    TabButton {
+                        label: "Party";
+                        active: root.tab == 3 && !root.settings-open;
+                        clicked => {
+                            root.tab = 3;
+                            root.settings-open = false;
+                            root.view-changed(3);
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            glyph: Glyphs.settings;
+                            size: 28px;
+                            tip: "Settings";
+                            tip-below: true;
+                            on: root.settings-open;
+                            clicked => {
+                                root.settings-open = !root.settings-open;
+                                root.view-changed(root.settings-open ? -1 : root.tab);
+                            }
+                        }
+                    }
+                }
+                if root.update-available && !root.update-dismissed: Rectangle {
+                    height: 40px;
+                    border-radius: 8px;
+                    background: Theme.accent-bg;
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 8px;
+                        spacing: 10px;
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            Text {
+                                text: "Version " + root.update-version + " is available" + (root.update-notes != "" ? " · " + root.update-notes : "");
+                                font-size: 12px;
+                                color: Theme.text;
+                                overflow: elide;
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            TextButton {
+                                label: "Get update";
+                                clicked => {
+                                    root.open-update();
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                glyph: Glyphs.close;
+                                size: 24px;
+                                tip: "Dismiss";
+                                tip-below: true;
+                                clicked => {
+                                    root.update-dismissed = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if root.settings-open: VerticalLayout {
+                    vertical-stretch: 1;
+                    alignment: start;
+                    spacing: 2px;
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: ab-ta.has-hover ? Theme.hover : transparent;
+                        ab-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Version " + root.app-version;
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: root.update-checking ? "Checking…" : (root.update-available ? "Version " + root.update-version + " is available at " + root.update-host : (root.update-note != "" ? root.update-note : "Checks once a day"));
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                    wrap: word-wrap;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextButton {
+                                    label: root.update-available ? "Get update" : "Check now";
+                                    clicked => {
+                                        if root.update-available {
+                                            root.open-update();
+                                        } else {
+                                            root.check-update();
+                                        }
+                                    }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Toggle {
+                                    checked: root.auto-update-check;
+                                    toggled(on) => {
+                                        root.auto-update-check = on;
+                                        root.set-auto-update(on);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: pr-ta.has-hover ? Theme.hover : transparent;
+                        pr-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Performance saving";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: "Turns off animations and covers, and refreshes the progress bar less often";
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                    wrap: word-wrap;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Toggle {
+                                    checked: root.perf-mode;
+                                    toggled(on) => {
+                                        root.perf-mode = on;
+                                        root.set-perf(on);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: ca-ta.has-hover ? Theme.hover : transparent;
+                        ca-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Audio cache";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: root.cache-text;
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextButton {
+                                    label: "Clear";
+                                    clicked => {
+                                        root.clear-cache();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: yt-ta.has-hover ? Theme.hover : transparent;
+                        yt-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "yt-dlp";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: root.ytdlp-note != "" ? root.ytdlp-note : (root.ytdlp-version != "" ? "Version " + root.ytdlp-version : "Checking version…");
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                    wrap: word-wrap;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextButton {
+                                    label: root.ytdlp-updating ? "Updating…" : "Update";
+                                    clicked => {
+                                        root.update-ytdlp();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: ac-ta.has-hover ? Theme.hover : transparent;
+                        ac-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Account";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: root.signed-in ? "Signed in with Google" : "Not signed in";
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                }
+                            }
+                            if root.signed-in: VerticalLayout {
+                                alignment: center;
+                                TextButton {
+                                    label: "Sign out";
+                                    clicked => {
+                                        root.sign-out();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: nm-ta.has-hover ? Theme.hover : transparent;
+                        nm-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Display name";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: "Shown to everyone in a party";
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextField {
+                                    min-width: 220px;
+                                    max-width: 220px;
+                                    text <=> root.display-name;
+                                    placeholder: "Your name";
+                                    edited(t) => {
+                                        root.display-name-edited(t);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 64px;
+                        border-radius: 8px;
+                        background: sv-ta.has-hover ? Theme.hover : transparent;
+                        sv-ta := TouchArea { }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Party server";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: root.party-server-built-in ? "Advanced. Leave empty to use the built-in server" : "The relay everyone in a party connects through";
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextField {
+                                    min-width: 220px;
+                                    max-width: 220px;
+                                    text <=> root.party-server;
+                                    placeholder: root.party-server-built-in ? "Built-in server" : "wss://your-relay.example.com";
+                                    edited(t) => {
+                                        root.party-server-edited(t);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if !root.settings-open && root.tab == 0: VerticalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 1;
+                    Rectangle {
+                        height: 38px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: input.has-focus ? Theme.accent : Theme.border;
+                        background: Theme.surface;
+                        Icon {
+                            glyph: Glyphs.search;
+                            tint: Theme.text3;
+                            x: 10px;
+                            y: (parent.height - self.height) / 2;
+                            width: 18px;
+                            height: 18px;
+                        }
+                        if root.query == "": Text {
+                            text: "Search songs, artists, albums";
+                            color: Theme.text3;
+                            font-size: 14px;
+                            x: 36px;
+                            y: (parent.height - self.height) / 2;
+                        }
+                        input := TextInput {
+                            text <=> root.query;
+                            x: 36px;
+                            y: 0px;
+                            height: parent.height;
+                            vertical-alignment: center;
+                            width: parent.width - 48px;
+                            font-size: 14px;
+                            color: Theme.text;
+                            accepted => {
+                                root.search(root.query);
+                            }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        ScrollList {
+                            VerticalLayout {
+                                spacing: 2px;
+                                alignment: start;
+                                for item[i] in root.results: TrackRow {
+                                    item: item;
+                                    action-glyph: Glyphs.plus;
+                                    action-tip: "Add to queue";
+                                    hover-intent => {
+                                        root.prefetch-result(i);
+                                    }
+                                    activated => {
+                                        root.play-result(i);
+                                    }
+                                    action => {
+                                        root.add-result(i);
+                                    }
+                                }
+                            }
+                        }
+                        if root.results.length == 0: Text {
+                            text: root.searching ? "Searching…" : (root.search-note != "" ? root.search-note : "Search for something to play");
+                            color: Theme.text3;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                if !root.settings-open && root.tab == 1 && !root.signed-in: VerticalLayout {
+                    vertical-stretch: 1;
+                    alignment: center;
+                    spacing: 12px;
+                    Text {
+                        text: "Sign in to see your library";
+                        color: Theme.text;
+                        font-size: 16px;
+                        font-weight: 500;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: "A Google sign-in window opens inside the app. Your password goes to Google's own page and is never seen by this app.";
+                        color: Theme.text2;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                        horizontal-alignment: center;
+                    }
+                    HorizontalLayout {
+                        alignment: center;
+                        TextButton {
+                            label: root.signing-in ? "Signing in…" : "Sign in with Google";
+                            primary: true;
+                            clicked => {
+                                root.sign-in-google();
+                            }
+                        }
+                    }
+                    Text {
+                        text: root.auth-note;
+                        color: Theme.danger;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: "Or import a cookies.txt file, or type a browser name (firefox, brave, chrome, edge)";
+                        color: Theme.text3;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                        horizontal-alignment: center;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Rectangle {
+                            height: 34px;
+                            horizontal-stretch: 1;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: signin-field.has-focus ? Theme.accent : Theme.border;
+                            background: Theme.surface;
+                            if root.signin-input == "": Text {
+                                text: "C:\\path\\to\\cookies.txt  or  firefox";
+                                color: Theme.text3;
+                                font-size: 13px;
+                                x: 12px;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            signin-field := TextInput {
+                                text <=> root.signin-input;
+                                x: 12px;
+                                y: 0px;
+                                height: parent.height;
+                                vertical-alignment: center;
+                                width: parent.width - 24px;
+                                font-size: 13px;
+                                color: Theme.text;
+                                accepted => {
+                                    root.sign-in(root.signin-input);
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            TextButton {
+                                label: "Import";
+                                clicked => {
+                                    root.sign-in(root.signin-input);
+                                }
+                            }
+                        }
+                    }
+                }
+                if !root.settings-open && root.tab == 1 && root.signed-in && !root.in-playlist: VerticalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        height: 26px;
+                        spacing: 8px;
+                        Text {
+                            text: "Your playlists";
+                            color: Theme.text2;
+                            font-size: 12px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                        IconButton {
+                            glyph: Glyphs.refresh;
+                            size: 26px;
+                            tip: "Refresh";
+                            tip-below: true;
+                            clicked => {
+                                root.refresh-library();
+                            }
+                        }
+                        TextLink {
+                            label: "Sign out";
+                            clicked => {
+                                root.sign-out();
+                            }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        ScrollList {
+                            VerticalLayout {
+                                spacing: 2px;
+                                alignment: start;
+                                for item[i] in root.playlists: TrackRow {
+                                    item: item;
+                                    playable: false;
+                                    activated => {
+                                        root.in-playlist = true;
+                                        root.open-playlist(i);
+                                    }
+                                }
+                            }
+                        }
+                        if root.playlists.length == 0: Text {
+                            text: root.library-loading ? "Loading your library…" : (root.library-note != "" ? root.library-note : "No playlists found");
+                            color: Theme.text3;
+                            font-size: 14px;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                if !root.settings-open && root.tab == 1 && root.signed-in && root.in-playlist: VerticalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        height: 30px;
+                        spacing: 10px;
+                        TextButton {
+                            label: "Back";
+                            clicked => {
+                                root.in-playlist = false;
+                            }
+                        }
+                        Text {
+                            text: root.playlist-title;
+                            color: Theme.text;
+                            font-size: 14px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        TextButton {
+                            label: "Play all";
+                            primary: true;
+                            clicked => {
+                                root.play-all();
+                            }
+                        }
+                        TextButton {
+                            label: "Add all";
+                            clicked => {
+                                root.add-all();
+                            }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        ScrollList {
+                            VerticalLayout {
+                                spacing: 2px;
+                                alignment: start;
+                                for item[i] in root.playlist-tracks: TrackRow {
+                                    item: item;
+                                    action-glyph: Glyphs.plus;
+                                    action-tip: "Add to queue";
+                                    hover-intent => {
+                                        root.prefetch-playlist-track(i);
+                                    }
+                                    activated => {
+                                        root.play-playlist-track(i);
+                                    }
+                                    action => {
+                                        root.add-playlist-track(i);
+                                    }
+                                }
+                            }
+                        }
+                        if root.playlist-tracks.length == 0: Text {
+                            text: root.playlist-loading ? "Loading…" : (root.playlist-note != "" ? root.playlist-note : "This playlist is empty");
+                            color: Theme.text3;
+                            font-size: 14px;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                if !root.settings-open && root.tab == 2: VerticalLayout {
+                    spacing: 8px;
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        height: 20px;
+                        Text {
+                            text: root.now-title;
+                            color: Theme.text2;
+                            font-size: 12px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        Text {
+                            text: root.lyrics-source;
+                            color: Theme.text3;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                            horizontal-alignment: right;
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        property <int> now: root.lyrics-current;
+                        property <int> count: root.lyrics-lines.length;
+                        changed now => {
+                            lyric-list.scroll-center(root.lyrics-current * 36px + 18px);
+                        }
+                        changed count => {
+                            lyric-list.scroll-center(0px);
+                        }
+                        lyric-list := ScrollList {
+                            VerticalLayout {
+                                alignment: start;
+                                for line[i] in root.lyrics-lines: LyricRow {
+                                    line: line;
+                                    current: root.lyrics-synced && i == root.lyrics-current;
+                                    seekable: root.lyrics-synced;
+                                    activated => {
+                                        root.seek-lyric(line.time);
+                                    }
+                                }
+                            }
+                        }
+                        if root.lyrics-lines.length == 0: Text {
+                            text: root.lyrics-loading ? "Looking for lyrics…" : (root.lyrics-note != "" ? root.lyrics-note : "Play a song to see its lyrics");
+                            color: Theme.text3;
+                            font-size: 14px;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                if !root.settings-open && root.tab == 3: VerticalLayout {
+                    spacing: 12px;
+                    vertical-stretch: 1;
+                    alignment: start;
+                    if root.party-note != "": Text {
+                        text: root.party-note;
+                        color: Theme.danger;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+                    if root.party-mode == 0 && !root.party-server-ready: Rectangle {
+                        height: 72px;
+                        border-radius: 12px;
+                        background: Theme.accent-bg;
+                        HorizontalLayout {
+                            padding: 14px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text {
+                                    text: "Add a party server first";
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    color: Theme.text;
+                                }
+                                Text {
+                                    text: "Parties connect through a small relay server. Paste its address in Settings.";
+                                    font-size: 12px;
+                                    color: Theme.text2;
+                                    wrap: word-wrap;
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextButton {
+                                    label: "Open settings";
+                                    clicked => {
+                                        root.settings-open = true;
+                                        root.view-changed(-1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if root.party-mode == 0: Card {
+                        height: 116px;
+                        Text {
+                            text: "Start a party";
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: Theme.text;
+                        }
+                        Text {
+                            text: "You choose what plays. Friends who join hear it at the same moment.";
+                            font-size: 12px;
+                            color: Theme.text2;
+                            wrap: word-wrap;
+                        }
+                        HorizontalLayout {
+                            padding-top: 6px;
+                            TextButton {
+                                label: "Start a party";
+                                primary: true;
+                                clicked => {
+                                    root.party-start();
+                                }
+                            }
+                            Rectangle {
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+                    if root.party-mode == 0: Card {
+                        height: 128px;
+                        Text {
+                            text: "Join a party";
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: Theme.text;
+                        }
+                        Text {
+                            text: "Enter the code the host shares with you.";
+                            font-size: 12px;
+                            color: Theme.text2;
+                        }
+                        HorizontalLayout {
+                            padding-top: 6px;
+                            spacing: 8px;
+                            TextField {
+                                horizontal-stretch: 1;
+                                text <=> root.party-code-input;
+                                placeholder: "Party code";
+                                accepted(t) => {
+                                    root.party-join(t);
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                TextButton {
+                                    label: "Join";
+                                    clicked => {
+                                        root.party-join(root.party-code-input);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if root.party-mode > 0 && root.party-connecting: Text {
+                        text: "Connecting to the party server…";
+                        color: Theme.text3;
+                        font-size: 13px;
+                    }
+                    if root.party-mode == 2 && !root.party-connecting: Rectangle {
+                        height: 36px;
+                        border-radius: 8px;
+                        background: Theme.accent-bg;
+                        Text {
+                            text: "Listening with " + root.party-host-name + ". Only the host controls playback.";
+                            color: Theme.accent;
+                            font-size: 12px;
+                            x: 12px;
+                            width: parent.width - 24px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                    if root.party-mode > 0 && !root.party-connecting: Card {
+                        height: root.party-mode == 1 ? 140px : 96px;
+                        property <bool> copied;
+                        Timer {
+                            interval: 1500ms;
+                            running: copied;
+                            triggered => {
+                                copied = false;
+                            }
+                        }
+                        if root.party-mode == 1: Text {
+                            text: "Your party code";
+                            font-size: 12px;
+                            color: Theme.text2;
+                        }
+                        if root.party-mode == 1: Text {
+                            text: root.party-room;
+                            font-size: 30px;
+                            font-weight: 500;
+                            font-family: "Consolas";
+                            letter-spacing: 4px;
+                            color: Theme.text;
+                        }
+                        if root.party-mode == 2: Text {
+                            text: root.party-host-name + "'s party";
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: Theme.text;
+                        }
+                        if root.party-mode == 2: Text {
+                            text: "Code \{root.party-room} · \{root.party-members.length} listening\{root.party-sync != "" ? " · " + root.party-sync : ""}";
+                            font-size: 12px;
+                            color: Theme.text2;
+                        }
+                        HorizontalLayout {
+                            padding-top: 4px;
+                            spacing: 8px;
+                            if root.party-mode == 1: TextButton {
+                                label: copied ? "Copied" : "Copy code";
+                                clicked => {
+                                    root.copy-text(root.party-room);
+                                    copied = true;
+                                }
+                            }
+                            TextButton {
+                                label: root.party-mode == 1 ? "End party" : "Leave party";
+                                danger: true;
+                                clicked => {
+                                    root.party-leave();
+                                }
+                            }
+                            Rectangle {
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+                    if root.party-mode > 0 && !root.party-connecting: VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: "Listening now · \{root.party-members.length}";
+                            font-size: 12px;
+                            color: Theme.text2;
+                        }
+                        for m in root.party-members: Rectangle {
+                            height: 40px;
+                            border-radius: 8px;
+                            background: m-ta.has-hover ? Theme.hover : transparent;
+                            m-ta := TouchArea { }
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                spacing: 10px;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        min-width: 28px;
+                                        max-width: 28px;
+                                        min-height: 28px;
+                                        max-height: 28px;
+                                        border-radius: 14px;
+                                        background: Theme.accent-bg;
+                                        Text {
+                                            text: m.initial;
+                                            color: Theme.accent;
+                                            font-size: 12px;
+                                            font-weight: 500;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                Text {
+                                    text: m.name;
+                                    font-size: 13px;
+                                    color: Theme.text;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+                                if m.tag != "": VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        min-width: pill-text.preferred-width + 16px;
+                                        max-width: pill-text.preferred-width + 16px;
+                                        height: 20px;
+                                        border-radius: 10px;
+                                        background: m.tag == "In sync" ? Theme.success-bg : (m.tag == "Host" ? Theme.accent-bg : Theme.surface);
+                                        pill-text := Text {
+                                            text: m.tag;
+                                            font-size: 11px;
+                                            color: m.tag == "In sync" ? Theme.success : (m.tag == "Host" ? Theme.accent : Theme.text2);
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                width: 1px;
+                background: Theme.border;
+            }
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+                min-width: 270px;
+                max-width: 270px;
+                HorizontalLayout {
+                    height: 22px;
+                    Text {
+                        text: "Up next";
+                        color: Theme.text2;
+                        font-size: 12px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    if root.queue.length > 0: TextLink {
+                        label: "Clear";
+                        clicked => {
+                            root.clear-queue();
+                        }
+                    }
+                }
+                Rectangle {
+                    vertical-stretch: 1;
+                    ScrollList {
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: start;
+                            for item[i] in root.queue: TrackRow {
+                                item: item;
+                                current: i == root.current-index;
+                                action-glyph: Glyphs.close;
+                                action-tip: "Remove";
+                                hover-intent => {
+                                    root.prefetch-queue(i);
+                                }
+                                activated => {
+                                    root.play-queue(i);
+                                }
+                                action => {
+                                    root.remove-queue(i);
+                                }
+                            }
+                        }
+                    }
+                    if root.queue.length == 0: Text {
+                        text: "Your queue is empty.\nAdd tracks with +";
+                        color: Theme.text3;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+        Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+        Rectangle {
+            height: 76px;
+            background: Theme.surface;
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 16px;
+                spacing: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        min-width: 48px;
+                        max-width: 48px;
+                        min-height: 48px;
+                        max-height: 48px;
+                        border-radius: 6px;
+                        background: Theme.accent-bg;
+                        clip: true;
+                        if root.now-cover.width > 0 && !Theme.perf: Image {
+                            source: root.now-cover;
+                            width: parent.width;
+                            height: parent.height;
+                        }
+                        if root.now-cover.width == 0 || Theme.perf: Icon {
+                            glyph: Glyphs.music;
+                            tint: Theme.accent;
+                            width: 22px;
+                            height: 22px;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    min-width: 150px;
+                    max-width: 150px;
+                    Text {
+                        text: root.now-title;
+                        color: Theme.text;
+                        font-size: 13px;
+                        font-weight: 500;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.now-detail;
+                        color: Theme.text2;
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        spacing: 4px;
+                        IconButton {
+                            glyph: Glyphs.shuffle;
+                            size: 32px;
+                            tint: Theme.text3;
+                            on: root.shuffle;
+                            tip: root.shuffle ? "Shuffle on" : "Shuffle";
+                            enabled: !root.controls-locked;
+                            clicked => {
+                                root.toggle-shuffle();
+                            }
+                        }
+                        IconButton {
+                            glyph: Glyphs.prev;
+                            tip: "Previous";
+                            enabled: !root.controls-locked;
+                            clicked => {
+                                root.prev();
+                            }
+                        }
+                        IconButton {
+                            glyph: (root.active && !root.paused) ? Glyphs.pause : Glyphs.play;
+                            size: 44px;
+                            solid: true;
+                            tip: (root.active && !root.paused) ? "Pause" : "Play";
+                            enabled: !root.controls-locked;
+                            clicked => {
+                                root.toggle-pause();
+                            }
+                        }
+                        IconButton {
+                            glyph: Glyphs.next;
+                            tip: "Next";
+                            enabled: !root.controls-locked;
+                            clicked => {
+                                root.next();
+                            }
+                        }
+                        Rectangle {
+                            min-width: 32px;
+                            max-width: 32px;
+                            IconButton {
+                                glyph: Glyphs.repeat;
+                                size: 32px;
+                                tint: Theme.text3;
+                                on: root.repeat-mode > 0;
+                                tip: root.repeat-mode == 0 ? "Repeat" : (root.repeat-mode == 1 ? "Repeat all" : "Repeat one");
+                                enabled: !root.controls-locked;
+                                clicked => {
+                                    root.cycle-repeat();
+                                }
+                            }
+                            if root.repeat-mode == 2: Text {
+                                text: "1";
+                                color: Theme.accent;
+                                font-size: 9px;
+                                font-weight: 500;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2 + 1px;
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.pos-text;
+                        color: Theme.text3;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                        horizontal-alignment: right;
+                        min-width: 36px;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        seek-bar := Scrub {
+                            value: Math.min(Math.max(root.progress, 0), 1);
+                            enabled: !root.controls-locked;
+                            bubble: root.duration-secs > 0 ? root.clock(seek-bar.hover-fraction * root.duration-secs) : "";
+                            committed(f) => {
+                                root.seek(f);
+                            }
+                        }
+                    }
+                    Text {
+                        text: root.dur-text;
+                        color: Theme.text3;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                        min-width: 36px;
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    min-width: 120px;
+                    max-width: 120px;
+                    VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            glyph: Glyphs.volume;
+                            tint: Theme.text3;
+                            width: 18px;
+                            height: 18px;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        volume-bar := Scrub {
+                            value: root.volume;
+                            live: true;
+                            bubble: "\{Math.round(volume-bar.hover-fraction * 100)}%";
+                            committed(f) => {
+                                root.volume = f;
+                                root.set-volume(f);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if TipState.shown && TipState.text != "": Rectangle {
+        z: 100;
+        property <length> tip-w: Math.min(tip-label.preferred-width, 320px) + 16px;
+        width: self.tip-w;
+        height: tip-label.preferred-height + 10px;
+        x: Math.min(Math.max(TipState.x - self.tip-w / 2, 6px), root.width - self.tip-w - 6px);
+        y: TipState.above ? TipState.y - self.height - 6px : TipState.y + 6px;
+        border-radius: 5px;
+        background: Theme.text;
+        tip-label := Text {
+            text: TipState.text;
+            color: Theme.bg;
+            font-size: 11px;
+            wrap: word-wrap;
+            x: 8px;
+            y: 5px;
+            width: parent.width - 16px;
+        }
+    }
+}

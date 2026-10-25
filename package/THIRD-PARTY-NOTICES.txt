@@ -1,0 +1,39 @@
+Third-party software in ytmusic-lite
+====================================
+
+ytmusic-lite is built from, and ships with, the software below. Each project has its
+own licence. This list says where to find them; it is not a substitute for reading the
+licences, and I have not verified every licence's conditions for redistribution. Check
+them before sharing the package publicly.
+
+Shipped as separate files next to the program
+---------------------------------------------
+libmpv-2.dll   The mpv media player library.
+               Project: https://mpv.io  (source: https://github.com/mpv-player/mpv)
+               The bundled build comes from https://github.com/zhongfly/mpv-winbuild
+               (release 2026-10-25, commit baa3e11d42). mpv builds can be GPL or LGPL
+               depending on how they were compiled: check this build's licence.
+
+yt-dlp.exe     Downloads song audio.
+               Project: https://github.com/yt-dlp/yt-dlp  (release 2026.10.21)
+               Licence: see https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE
+
+deno.exe       JavaScript runtime that yt-dlp uses to solve YouTube's checks.
+               Project: https://deno.com  (release 2.9.8)
+               Licence: see https://github.com/denoland/deno/blob/main/LICENSE.md
+
+Compiled into the program
+-------------------------
+Slint          User interface toolkit. https://slint.dev
+               Slint is offered under more than one licence, each with its own
+               conditions: see https://slint.dev/terms-and-conditions
+
+Rust libraries (each under its own licence, see crates.io for the exact terms):
+  libloading, serde_json, sha1, ureq, rustls, image, tungstenite, wry (WebView2),
+  souvlaki, tray-icon, arboard, webbrowser, embed-resource
+
+Other services the app talks to
+-------------------------------
+YouTube Music and YouTube (song search, playlists, audio), LRCLIB (https://lrclib.net,
+timestamped lyrics), and the listening-party relay. The app is not affiliated with or
+endorsed by any of them.

@@ -1,0 +1,26 @@
+# systemd unit for running the relay on a Linux home server.
+#   1. Install Deno and copy relay.ts to /opt/ytmusic-relay/
+#   2. sudo cp ytmusic-relay.service /etc/systemd/system/
+#   3. sudo systemctl enable --now ytmusic-relay
+#
+# It listens only on this machine (127.0.0.1); a tunnel or reverse proxy on the same
+# machine is what the internet talks to. Change HOST to 0.0.0.0 if the proxy runs elsewhere.
+[Unit]
+Description=ytmusic-lite listening-party relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/ytmusic-relay
+Environment=PORT=8787
+Environment=HOST=127.0.0.1
+ExecStart=/usr/local/bin/deno run --allow-net --allow-env --allow-read=latest.json relay.ts
+Restart=always
+RestartSec=3
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
