@@ -4,6 +4,10 @@ export struct TrackItem {
     id: string,
     title: string,
     channel: string,
+    /// `channel` split into the artist (a link when `artist-id` is set) and the rest ("Album")
+    artist: string,
+    rest: string,
+    artist-id: string,
     duration: string,
     thumb: image,
 }
@@ -461,8 +465,60 @@ component Scrub inherits Rectangle {
     }
 }
 
+/// "Artist · Album", where the artist's name opens their page when it can
+component CreditLine inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> artist;
+    in property <string> rest;
+    in property <string> artist-id;
+    callback artist-clicked(string);
+    preferred-height: 16px;
+    spacing: 0px;
+    if root.artist-id == "": Text {
+        text: root.text;
+        color: Theme.text2;
+        font-size: 12px;
+        overflow: elide;
+        horizontal-stretch: 1;
+    }
+    if root.artist-id != "": Rectangle {
+        preferred-width: at.preferred-width;
+        min-width: 24px;
+        horizontal-stretch: 0;
+        at := Text {
+            width: parent.width;
+            text: root.artist;
+            color: link-ta.has-hover ? Theme.accent : Theme.text2;
+            font-size: 12px;
+            overflow: elide;
+        }
+        Rectangle {
+            visible: link-ta.has-hover;
+            x: 0px;
+            y: parent.height - 1px;
+            height: 1px;
+            width: Math.min(at.preferred-width, parent.width);
+            background: Theme.accent;
+        }
+        link-ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.artist-clicked(root.artist-id);
+            }
+        }
+    }
+    if root.artist-id != "": Text {
+        text: root.rest != "" ? " · " + root.rest : "";
+        color: Theme.text2;
+        font-size: 12px;
+        overflow: elide;
+        horizontal-stretch: 1;
+    }
+}
+
 component TrackRow inherits Rectangle {
     in property <TrackItem> item;
+    callback artist-clicked(string);
     in property <bool> current: false;
     in property <string> action-glyph;
     in property <string> action-tip;
@@ -567,11 +623,16 @@ component TrackRow inherits Rectangle {
                 font-size: 13px;
                 overflow: elide;
             }
-            Text {
+            CreditLine {
                 text: root.item.channel;
-                color: Theme.text2;
-                font-size: 12px;
-                overflow: elide;
+                artist: root.item.artist;
+                rest: root.item.rest;
+                artist-id: root.item.artist-id;
+                artist-clicked(id) => {
+                    TipState.shown = false;
+                    row-tip.fired = true;
+                    root.artist-clicked(id);
+                }
             }
         }
         Text {
@@ -652,6 +713,24 @@ export component MainWindow inherits Window {
     in property <string> search-note;
     in property <string> now-title: "Nothing playing";
     in property <string> now-detail;
+    /// `now-detail` split so the artist can be a link (empty while a status message shows)
+    in property <string> now-artist;
+    in property <string> now-rest;
+    in property <string> now-artist-id;
+    // artist pages. Their songs use `playlist-tracks`, so Play all and the row buttons work as in a playlist.
+    in-out property <bool> artist-open;
+    /// An album of the artist is open instead of the artist's own page
+    in property <bool> artist-album;
+    in property <bool> artist-loading;
+    in property <string> artist-note;
+    in property <string> artist-name;
+    in property <string> artist-sub;
+    in property <image> artist-image;
+    in property <[TrackItem]> artist-albums;
+    callback open-artist(string);
+    callback open-album(int);
+    callback artist-back();
+    callback close-artist();
     in property <image> now-cover;
     in property <string> pos-text: "0:00";
     in property <string> dur-text: "0:00";
@@ -783,38 +862,46 @@ export component MainWindow inherits Window {
                     height: 28px;
                     TabButton {
                         label: "Search";
-                        active: root.tab == 0 && !root.settings-open;
+                        active: root.tab == 0 && !root.settings-open && !root.artist-open;
                         clicked => {
                             root.tab = 0;
                             root.settings-open = false;
+                            root.artist-open = false;
+                            root.close-artist();
                             root.view-changed(0);
                         }
                     }
                     TabButton {
                         label: "Library";
-                        active: root.tab == 1 && !root.settings-open;
+                        active: root.tab == 1 && !root.settings-open && !root.artist-open;
                         clicked => {
                             root.tab = 1;
                             root.settings-open = false;
+                            root.artist-open = false;
+                            root.close-artist();
                             root.view-changed(1);
                             root.open-library();
                         }
                     }
                     TabButton {
                         label: "Lyrics";
-                        active: root.tab == 2 && !root.settings-open;
+                        active: root.tab == 2 && !root.settings-open && !root.artist-open;
                         clicked => {
                             root.tab = 2;
                             root.settings-open = false;
+                            root.artist-open = false;
+                            root.close-artist();
                             root.view-changed(2);
                         }
                     }
                     TabButton {
                         label: "Party";
-                        active: root.tab == 3 && !root.settings-open;
+                        active: root.tab == 3 && !root.settings-open && !root.artist-open;
                         clicked => {
                             root.tab = 3;
                             root.settings-open = false;
+                            root.artist-open = false;
+                            root.close-artist();
                             root.view-changed(3);
                         }
                     }
@@ -1151,7 +1238,150 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                if !root.settings-open && root.tab == 0: VerticalLayout {
+                if root.artist-open && !root.settings-open: VerticalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 1;
+                    HorizontalLayout {
+                        height: 30px;
+                        TextButton {
+                            label: "Back";
+                            clicked => {
+                                root.artist-back();
+                            }
+                        }
+                        Rectangle {
+                            horizontal-stretch: 1;
+                        }
+                    }
+                    HorizontalLayout {
+                        height: 72px;
+                        spacing: 14px;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                min-width: 72px;
+                                max-width: 72px;
+                                min-height: 72px;
+                                max-height: 72px;
+                                border-radius: 8px;
+                                background: Theme.border;
+                                clip: true;
+                                if root.artist-image.width > 0 && !Theme.perf: Image {
+                                    source: root.artist-image;
+                                    width: parent.width;
+                                    height: parent.height;
+                                }
+                                if root.artist-image.width == 0 || Theme.perf: Icon {
+                                    glyph: Glyphs.music;
+                                    tint: Theme.text3;
+                                    width: 26px;
+                                    height: 26px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            Text {
+                                text: root.artist-name;
+                                font-size: 20px;
+                                font-weight: 500;
+                                color: Theme.text;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: root.artist-sub;
+                                font-size: 12px;
+                                color: Theme.text2;
+                                overflow: elide;
+                            }
+                            HorizontalLayout {
+                                padding-top: 6px;
+                                spacing: 8px;
+                                TextButton {
+                                    label: "Play all";
+                                    primary: true;
+                                    clicked => {
+                                        root.play-all();
+                                    }
+                                }
+                                TextButton {
+                                    label: "Add all";
+                                    clicked => {
+                                        root.add-all();
+                                    }
+                                }
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                        ScrollList {
+                            VerticalLayout {
+                                spacing: 2px;
+                                alignment: start;
+                                if root.playlist-tracks.length > 0: Text {
+                                    text: root.artist-album ? "Tracks" : "Top songs";
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    color: Theme.text2;
+                                    height: 26px;
+                                    vertical-alignment: center;
+                                }
+                                for item[i] in root.playlist-tracks: TrackRow {
+                                    item: item;
+                                    action-glyph: Glyphs.plus;
+                                    action-tip: "Add to queue";
+                                    hover-intent => {
+                                        root.prefetch-playlist-track(i);
+                                    }
+                                    activated => {
+                                        root.play-playlist-track(i);
+                                    }
+                                    action => {
+                                        root.add-playlist-track(i);
+                                    }
+                                    artist-clicked(id) => {
+                                        root.open-artist(id);
+                                    }
+                                }
+                                if root.artist-albums.length > 0 && !root.artist-album: Text {
+                                    text: "Albums and singles";
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    color: Theme.text2;
+                                    height: 40px;
+                                    vertical-alignment: bottom;
+                                }
+                                if !root.artist-album: VerticalLayout {
+                                    spacing: 2px;
+                                    for item[i] in root.artist-albums: TrackRow {
+                                        item: item;
+                                        playable: false;
+                                        activated => {
+                                            root.open-album(i);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if root.artist-loading || root.artist-note != "": Text {
+                            text: root.artist-loading ? "Loading…" : root.artist-note;
+                            color: Theme.text3;
+                            font-size: 14px;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                if !root.settings-open && !root.artist-open && root.tab == 0: VerticalLayout {
                     spacing: 10px;
                     vertical-stretch: 1;
                     Rectangle {
@@ -1196,6 +1426,9 @@ export component MainWindow inherits Window {
                                 spacing: 2px;
                                 alignment: start;
                                 for item[i] in root.results: TrackRow {
+                                    artist-clicked(id) => {
+                                        root.open-artist(id);
+                                    }
                                     item: item;
                                     action-glyph: Glyphs.plus;
                                     action-tip: "Add to queue";
@@ -1220,7 +1453,7 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                if !root.settings-open && root.tab == 1 && !root.signed-in: VerticalLayout {
+                if !root.settings-open && !root.artist-open && root.tab == 1 && !root.signed-in: VerticalLayout {
                     vertical-stretch: 1;
                     alignment: center;
                     spacing: 12px;
@@ -1303,7 +1536,7 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                if !root.settings-open && root.tab == 1 && root.signed-in && !root.in-playlist: VerticalLayout {
+                if !root.settings-open && !root.artist-open && root.tab == 1 && root.signed-in && !root.in-playlist: VerticalLayout {
                     spacing: 10px;
                     vertical-stretch: 1;
                     HorizontalLayout {
@@ -1359,7 +1592,7 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                if !root.settings-open && root.tab == 1 && root.signed-in && root.in-playlist: VerticalLayout {
+                if !root.settings-open && !root.artist-open && root.tab == 1 && root.signed-in && root.in-playlist: VerticalLayout {
                     spacing: 10px;
                     vertical-stretch: 1;
                     HorizontalLayout {
@@ -1401,6 +1634,9 @@ export component MainWindow inherits Window {
                                 spacing: 2px;
                                 alignment: start;
                                 for item[i] in root.playlist-tracks: TrackRow {
+                                    artist-clicked(id) => {
+                                        root.open-artist(id);
+                                    }
                                     item: item;
                                     action-glyph: Glyphs.plus;
                                     action-tip: "Add to queue";
@@ -1426,7 +1662,7 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                if !root.settings-open && root.tab == 2: VerticalLayout {
+                if !root.settings-open && !root.artist-open && root.tab == 2: VerticalLayout {
                     spacing: 8px;
                     vertical-stretch: 1;
                     HorizontalLayout {
@@ -1481,7 +1717,7 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                if !root.settings-open && root.tab == 3: VerticalLayout {
+                if !root.settings-open && !root.artist-open && root.tab == 3: VerticalLayout {
                     spacing: 12px;
                     vertical-stretch: 1;
                     alignment: start;
@@ -1798,6 +2034,9 @@ export component MainWindow inherits Window {
                             spacing: 2px;
                             alignment: start;
                             for item[i] in root.queue: TrackRow {
+                                artist-clicked(id) => {
+                                    root.open-artist(id);
+                                }
                                 item: item;
                                 current: i == root.current-index;
                                 action-glyph: Glyphs.close;
@@ -1871,11 +2110,20 @@ export component MainWindow inherits Window {
                         font-weight: 500;
                         overflow: elide;
                     }
-                    Text {
+                    if root.now-artist-id == "": Text {
                         text: root.now-detail;
                         color: Theme.text2;
                         font-size: 12px;
                         overflow: elide;
+                    }
+                    if root.now-artist-id != "": CreditLine {
+                        text: root.now-detail;
+                        artist: root.now-artist;
+                        rest: root.now-rest;
+                        artist-id: root.now-artist-id;
+                        artist-clicked(id) => {
+                            root.open-artist(id);
+                        }
                     }
                 }
                 VerticalLayout {

@@ -1,5 +1,5 @@
 use crate::cookies;
-use crate::innertube::{Client, PlaylistInfo};
+use crate::innertube::{AlbumInfo, ArtistPage, Client, PlaylistInfo};
 use crate::lyrics::{self, Lyrics};
 use crate::mpv::{Mpv, PlayerEvent};
 use crate::party::{self, Act, ActKind, Correction, HostState, Out as PartyOut, TrackInfo};
@@ -71,6 +71,15 @@ pub enum Cmd {
     LibraryLoaded(Result<Vec<PlaylistInfo>, String>),
     OpenPlaylist(usize),
     PlaylistLoaded { id: String, result: Result<Vec<Track>, String> },
+    /// Show an artist's page (the id is the "UC…" page id)
+    OpenArtist(String),
+    ArtistLoaded { id: String, result: Result<ArtistPage, String> },
+    /// Open one of the albums or singles listed on the artist page
+    OpenAlbum(usize),
+    AlbumLoaded { id: String, result: Result<Vec<Track>, String> },
+    /// Back from an album to the artist, or from the artist to where the user was
+    ArtistBack,
+    CloseArtist,
     PlayPlaylistTrack(usize),
     AddPlaylistTrack(usize),
     PlayAll,
@@ -101,6 +110,11 @@ pub enum Cmd {
     UpdateChecked { manual: bool, result: Result<Option<update::Release>, String> },
     OpenUpdate,
     SetAutoUpdate(bool),
+}
+
+struct ArtistView {
+    id: String,
+    page: ArtistPage,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -217,6 +231,13 @@ struct Engine {
     /// Id of the playlist whose tracks are shown (or loading)
     playlist_id: String,
     playlist_tracks: Vec<Track>,
+    /// The artist page being shown. While it is open, `playlist_tracks` holds its top
+    /// songs, or the songs of `album_open`, so Play all, Add all and the row buttons work as in a playlist.
+    artist: Option<ArtistView>,
+    /// Artist (and album) whose page is loading; an answer for any other is ignored
+    artist_wanted: String,
+    album_open: Option<AlbumInfo>,
+    album_wanted: String,
     state_path: PathBuf,
     /// Set by `sync` whenever something worth saving changed
     dirty: Cell<bool>,
@@ -313,6 +334,10 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
         library_loading: false,
         playlist_id: String::new(),
         playlist_tracks: Vec::new(),
+        artist: None,
+        artist_wanted: String::new(),
+        album_open: None,
+        album_wanted: String::new(),
         state_path,
         dirty: Cell::new(false),
         last_save: Instant::now(),
@@ -422,6 +447,15 @@ impl Engine {
         for p in self.playlists.iter().filter(|p| !p.thumb.is_empty()) {
             wanted.entry(p.id.as_str()).or_insert(p.thumb.as_str());
         }
+        // an artist page shows the artist's photo and the covers of their albums
+        if let Some(view) = &self.artist {
+            if !view.page.image.is_empty() {
+                wanted.entry(view.id.as_str()).or_insert(view.page.image.as_str());
+            }
+            for a in view.page.albums.iter().filter(|a| !a.thumb.is_empty()) {
+                wanted.entry(a.id.as_str()).or_insert(a.thumb.as_str());
+            }
+        }
         self.thumbs.retain(|id, _| wanted.contains_key(id.as_str()));
         let missing: Vec<(String, String)> = wanted
             .iter()
@@ -440,21 +474,32 @@ impl Engine {
         if self.perf {
             return;
         }
+        let on_artist_page = self.artist.as_ref().is_some_and(|v| v.id == id || v.page.albums.iter().any(|a| a.id == id));
         let still_shown = self.results.iter().chain(&self.queue).chain(&self.playlist_tracks).any(|t| t.id == id)
-            || self.playlists.iter().any(|p| p.id == id);
+            || self.playlists.iter().any(|p| p.id == id)
+            || on_artist_page;
         if !still_shown {
             return;
         }
         let rgba = Arc::new(rgba);
         self.thumbs.insert(id.clone(), rgba.clone());
         let current_id = self.cur.and_then(|c| self.queue.get(c)).map(|t| t.id.clone());
+        // the picture at the top of the artist page: the artist's photo, or the open album's cover
+        let header_id = match (&self.album_open, &self.artist) {
+            (Some(album), _) => Some(album.id.clone()),
+            (None, Some(view)) => Some(view.id.clone()),
+            _ => None,
+        };
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             let img = cover(&rgba);
             if current_id.as_deref() == Some(id.as_str()) {
                 ui.set_now_cover(img.clone());
             }
+            if header_id.as_deref() == Some(id.as_str()) {
+                ui.set_artist_image(img.clone());
+            }
             // update rows in place so the lists don't rebuild or jump while scrolling
-            for model in [ui.get_results(), ui.get_queue(), ui.get_playlist_tracks(), ui.get_playlists()] {
+            for model in [ui.get_results(), ui.get_queue(), ui.get_playlist_tracks(), ui.get_playlists(), ui.get_artist_albums()] {
                 for i in 0..model.row_count() {
                     if let Some(mut row) = model.row_data(i) {
                         if row.id == id.as_str() {
@@ -580,6 +625,12 @@ impl Engine {
             Cmd::LibraryLoaded(result) => self.library_loaded(result),
             Cmd::OpenPlaylist(i) => self.open_playlist(i),
             Cmd::PlaylistLoaded { id, result } => self.playlist_loaded(id, result),
+            Cmd::OpenArtist(id) => self.open_artist(id),
+            Cmd::ArtistLoaded { id, result } => self.artist_loaded(id, result),
+            Cmd::OpenAlbum(i) => self.open_album(i),
+            Cmd::AlbumLoaded { id, result } => self.album_loaded(id, result),
+            Cmd::ArtistBack => self.artist_back(),
+            Cmd::CloseArtist => self.close_artist(),
             Cmd::SignIn(input) => self.sign_in(input),
             Cmd::SignInDone(result) => self.sign_in_done(result),
             Cmd::SignOut => self.sign_out(),
@@ -868,6 +919,149 @@ impl Engine {
             ui.set_playlist_tracks(items(&tracks, &thumbs));
             ui.set_playlist_loading(false);
             ui.set_playlist_note(note.into());
+        });
+    }
+
+    // ---- artist pages -------------------------------------------------------
+
+    fn open_artist(&mut self, id: String) {
+        if !party::valid_artist_id(&id) {
+            return;
+        }
+        // a playlist still loading must not fill this page
+        self.playlist_id.clear();
+        self.playlist_tracks.clear();
+        self.artist = None;
+        self.album_open = None;
+        self.album_wanted.clear();
+        self.artist_wanted = id.clone();
+        let _ = self.ui.upgrade_in_event_loop(|ui| {
+            ui.set_in_playlist(false);
+            ui.set_artist_open(true);
+            ui.set_artist_album(false);
+            ui.set_artist_loading(true);
+            ui.set_artist_note("".into());
+            ui.set_artist_name("".into());
+            ui.set_artist_sub("".into());
+            ui.set_artist_image(Image::default());
+            ui.set_artist_albums(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
+        });
+        let (client, tx) = (self.client.clone(), self.tx.clone());
+        std::thread::spawn(move || {
+            let result = client.artist(&id);
+            let _ = tx.send(Cmd::ArtistLoaded { id, result });
+        });
+    }
+
+    fn artist_loaded(&mut self, id: String, result: Result<ArtistPage, String>) {
+        if id != self.artist_wanted {
+            return;
+        }
+        match result {
+            Ok(page) => {
+                self.playlist_tracks = page.songs.clone();
+                self.artist = Some(ArtistView { id, page });
+                self.push_artist();
+                let _ = self.ui.upgrade_in_event_loop(|ui| ui.set_artist_loading(false));
+            }
+            Err(note) => {
+                let _ = self.ui.upgrade_in_event_loop(move |ui| {
+                    ui.set_artist_loading(false);
+                    ui.set_artist_note(note.into());
+                });
+            }
+        }
+    }
+
+    fn open_album(&mut self, i: usize) {
+        let Some(album) = self.artist.as_ref().and_then(|v| v.page.albums.get(i)).cloned() else { return };
+        self.album_wanted = album.id.clone();
+        self.album_open = Some(album.clone());
+        self.playlist_tracks.clear();
+        self.push_artist();
+        let _ = self.ui.upgrade_in_event_loop(|ui| {
+            ui.set_artist_loading(true);
+            ui.set_artist_note("".into());
+        });
+        let (client, tx) = (self.client.clone(), self.tx.clone());
+        std::thread::spawn(move || {
+            let result = client.album_tracks(&album.id, &album.title, &album.thumb);
+            let _ = tx.send(Cmd::AlbumLoaded { id: album.id, result });
+        });
+    }
+
+    fn album_loaded(&mut self, id: String, result: Result<Vec<Track>, String>) {
+        if id != self.album_wanted || self.album_open.is_none() {
+            return;
+        }
+        let note = match result {
+            Ok(tracks) => {
+                self.playlist_tracks = tracks;
+                String::new()
+            }
+            Err(e) => e,
+        };
+        self.push_artist();
+        let _ = self.ui.upgrade_in_event_loop(move |ui| {
+            ui.set_artist_loading(false);
+            ui.set_artist_note(note.into());
+        });
+    }
+
+    fn artist_back(&mut self) {
+        if self.album_open.take().is_some() {
+            // from an album back to the artist's own page
+            self.album_wanted.clear();
+            self.playlist_tracks = self.artist.as_ref().map(|v| v.page.songs.clone()).unwrap_or_default();
+            self.push_artist();
+            let _ = self.ui.upgrade_in_event_loop(|ui| {
+                ui.set_artist_loading(false);
+                ui.set_artist_note("".into());
+            });
+        } else {
+            self.close_artist();
+        }
+    }
+
+    fn close_artist(&mut self) {
+        self.artist = None;
+        self.album_open = None;
+        self.artist_wanted.clear();
+        self.album_wanted.clear();
+        self.playlist_tracks.clear();
+        let _ = self.ui.upgrade_in_event_loop(|ui| {
+            ui.set_artist_open(false);
+            ui.set_artist_album(false);
+            ui.set_artist_loading(false);
+            ui.set_artist_albums(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
+        });
+    }
+
+    /// Fills the artist page: the header, the song list (the artist's or the open album's) and the albums
+    fn push_artist(&self) {
+        let Some(view) = self.artist.as_ref() else { return };
+        let (title, sub, image_id) = match &self.album_open {
+            Some(a) => (a.title.clone(), format!("{} · {}", view.page.name, a.subtitle), a.id.clone()),
+            None => (view.page.name.clone(), view.page.subtitle.clone(), view.id.clone()),
+        };
+        let is_album = self.album_open.is_some();
+        let image = self.thumbs.get(&image_id).cloned();
+        let albums: Vec<PlaylistInfo> = view
+            .page
+            .albums
+            .iter()
+            .map(|a| PlaylistInfo { id: a.id.clone(), title: a.title.clone(), subtitle: a.subtitle.clone(), thumb: a.thumb.clone() })
+            .collect();
+        let (tracks, thumbs) = (self.playlist_tracks.clone(), self.thumbs.clone());
+        let _ = self.ui.upgrade_in_event_loop(move |ui| {
+            ui.set_artist_album(is_album);
+            ui.set_artist_name(title.into());
+            ui.set_artist_sub(sub.into());
+            ui.set_artist_image(image.map(|b| cover(&b)).unwrap_or_default());
+            ui.set_artist_albums(playlist_items(&albums, &thumbs));
+            ui.set_playlist_tracks(items(&tracks, &thumbs));
         });
     }
 
@@ -1432,6 +1626,7 @@ impl Engine {
             ui.set_playlists(playlist_items(&playlists, &thumbs));
             ui.set_playlist_tracks(items(&tracks, &thumbs));
         });
+        self.push_artist();
     }
 
     fn push_settings(&self) {
@@ -1857,10 +2052,13 @@ impl Engine {
         let np = self.now_playing();
         let queue = self.queue.clone();
         let cur = self.cur.map_or(-1, |c| c as i32);
-        let (title, channel) = match self.cur.and_then(|c| self.queue.get(c)) {
-            Some(t) => (t.title.clone(), t.channel.clone()),
-            None => ("Nothing playing".to_string(), String::new()),
+        let (title, channel, artist_id) = match self.cur.and_then(|c| self.queue.get(c)) {
+            Some(t) => (t.title.clone(), t.channel.clone(), t.artist_id.clone()),
+            None => ("Nothing playing".to_string(), String::new(), String::new()),
         };
+        // a status message takes the artist line's place, so nothing links then
+        let (artist, rest) = if self.status.is_empty() { credit(&channel) } else { (String::new(), String::new()) };
+        let artist_id = if self.status.is_empty() { artist_id } else { String::new() };
         let detail = if self.status.is_empty() { channel } else { self.status.clone() };
         let (paused, loading, shuffle) = (self.paused, self.loading.is_some(), self.shuffle);
         let active = self.playing || loading;
@@ -1877,6 +2075,9 @@ impl Engine {
             ui.set_current_index(cur);
             ui.set_now_title(title.into());
             ui.set_now_detail(detail.into());
+            ui.set_now_artist(artist.into());
+            ui.set_now_rest(rest.into());
+            ui.set_now_artist_id(artist_id.into());
             ui.set_active(active);
             ui.set_paused(paused);
             ui.set_loading(loading);
@@ -1929,11 +2130,23 @@ fn items(tracks: &[Track], thumbs: &Thumbs) -> ModelRc<TrackItem> {
             id: t.id.clone().into(),
             title: t.title.clone().into(),
             channel: t.channel.clone().into(),
-            duration: clock(t.duration as f64).into(),
+            artist: credit(&t.channel).0.into(),
+            rest: credit(&t.channel).1.into(),
+            artist_id: t.artist_id.clone().into(),
+            // an artist's top songs come without a length; the player learns it when the song starts
+            duration: if t.duration == 0 { String::new() } else { clock(t.duration as f64) }.into(),
             thumb: thumbs.get(&t.id).map(|b| cover(b)).unwrap_or_default(),
         })
         .collect();
     ModelRc::new(VecModel::from(rows))
+}
+
+/// "Daft Punk & Julian · Discovery" -> ("Daft Punk & Julian", "Discovery"): the part that links to the artist, and the rest
+fn credit(channel: &str) -> (String, String) {
+    match channel.split_once(" · ") {
+        Some((artist, rest)) => (artist.to_string(), rest.to_string()),
+        None => (channel.to_string(), String::new()),
+    }
 }
 
 fn cover(rgba: &[u8]) -> Image {

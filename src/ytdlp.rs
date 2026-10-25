@@ -9,6 +9,8 @@ pub struct Track {
     pub duration: u32,
     /// Cover art URL; empty means "use the video thumbnail"
     pub thumb: String,
+    /// YouTube Music's page id for the first artist ("UC…"); empty when unknown
+    pub artist_id: String,
 }
 
 #[derive(Clone)]
@@ -108,6 +110,7 @@ impl YtDlp {
                     channel: p.next()?.to_string(),
                     duration: p.next()?.parse().unwrap_or(0),
                     thumb: String::new(),
+                    artist_id: String::new(),
                 })
             })
             .collect())

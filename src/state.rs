@@ -41,12 +41,13 @@ pub fn save(path: &Path, s: &Saved) -> std::io::Result<()> {
     out.push_str(&format!("update_check={}\n", s.auto_update_check as u8));
     for t in &s.queue {
         out.push_str(&format!(
-            "track\t{}\t{}\t{}\t{}\t{}\n",
+            "track\t{}\t{}\t{}\t{}\t{}\t{}\n",
             t.id,
             clean(&t.title),
             clean(&t.channel),
             t.duration,
-            clean(&t.thumb)
+            clean(&t.thumb),
+            clean(&t.artist_id)
         ));
     }
     // write beside the file and rename so a crash can't leave half a state file
@@ -89,6 +90,7 @@ pub fn load(path: &Path) -> Option<Saved> {
                 duration: dur.parse().unwrap_or(0),
                 // files from before covers were saved simply lack this field
                 thumb: p.next().unwrap_or("").to_string(),
+                artist_id: p.next().unwrap_or("").to_string(),
             });
         } else if let Some((k, v)) = line.split_once('=') {
             match k {

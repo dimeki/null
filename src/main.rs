@@ -136,6 +136,22 @@ fn main() -> Result<(), slint::PlatformError> {
         let _ = t.send(Cmd::SetAutoUpdate(on));
     });
     let t = tx.clone();
+    ui.on_open_artist(move |id| {
+        let _ = t.send(Cmd::OpenArtist(id.to_string()));
+    });
+    let t = tx.clone();
+    ui.on_open_album(move |i| {
+        let _ = t.send(Cmd::OpenAlbum(i as usize));
+    });
+    let t = tx.clone();
+    ui.on_artist_back(move || {
+        let _ = t.send(Cmd::ArtistBack);
+    });
+    let t = tx.clone();
+    ui.on_close_artist(move || {
+        let _ = t.send(Cmd::CloseArtist);
+    });
+    let t = tx.clone();
     ui.on_party_start(move || {
         let _ = t.send(Cmd::PartyHost);
     });

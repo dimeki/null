@@ -65,6 +65,36 @@ impl Client {
         Ok(tracks_in(&json))
     }
 
+    /// An artist's page: top songs, albums and singles
+    pub fn artist(&self, artist_id: &str) -> Result<ArtistPage, String> {
+        if !crate::party::valid_artist_id(artist_id) {
+            return Err("That isn't an artist page".into());
+        }
+        let page = artist_in(&self.post("browse", json!({ "browseId": artist_id }))?);
+        if page.name.is_empty() {
+            return Err("That artist page couldn't be read".into());
+        }
+        Ok(page)
+    }
+
+    /// The songs on an album or single. Album pages list no covers or album names of their
+    /// own, so the cover and title the artist page showed are filled in.
+    pub fn album_tracks(&self, album_id: &str, title: &str, cover: &str) -> Result<Vec<Track>, String> {
+        if !valid_album_id(album_id) {
+            return Err("That isn't an album".into());
+        }
+        let mut tracks = tracks_in(&self.post("browse", json!({ "browseId": album_id }))?);
+        for t in &mut tracks {
+            if t.thumb.is_empty() {
+                t.thumb = cover.to_string();
+            }
+            if !t.channel.contains(" · ") && !title.is_empty() {
+                t.channel = format!("{} · {title}", t.channel);
+            }
+        }
+        Ok(tracks)
+    }
+
     /// Plain-text lyrics from YouTube Music, if it has any for this song
     pub fn lyrics(&self, video_id: &str) -> Result<Option<String>, String> {
         let next = self.post("next", json!({ "videoId": video_id, "isAudioOnly": true }))?;
@@ -281,7 +311,90 @@ fn parse_track(item: &Value) -> Option<Track> {
 
     let thumb = last_thumbnail(&item["thumbnail"]);
 
-    Some(Track { id, title, channel, duration, thumb })
+    let artist_id = flex.get(1).map_or_else(String::new, |c| artist_id_in(&c["musicResponsiveListItemFlexColumnRenderer"]["text"]["runs"]));
+
+    Some(Track { id, title, channel, duration, thumb, artist_id })
+}
+
+/// The page id of the first artist named in a column of runs ("A & B • Album" gives A's)
+fn artist_id_in(runs: &Value) -> String {
+    runs.as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|r| r["navigationEndpoint"]["browseEndpoint"]["browseId"].as_str().filter(|id| crate::party::valid_artist_id(id)))
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// An album or single on an artist's page
+#[derive(Clone, Debug, PartialEq)]
+pub struct AlbumInfo {
+    pub id: String,
+    pub title: String,
+    /// "Album • 2023"
+    pub subtitle: String,
+    pub thumb: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ArtistPage {
+    pub name: String,
+    /// "67.8M monthly audience", when YouTube Music says
+    pub subtitle: String,
+    pub image: String,
+    pub songs: Vec<Track>,
+    pub albums: Vec<AlbumInfo>,
+}
+
+/// Album ids are fetched like artist ids, so only YouTube Music's own form is accepted
+fn valid_album_id(id: &str) -> bool {
+    id.starts_with("MPRE") && id.len() <= 40 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// A square crop of a (wide) artist photo, small enough for an avatar
+fn avatar_url(url: &str) -> String {
+    match url.split_once('=') {
+        Some((base, _)) if !base.is_empty() => format!("{base}=w120-h120-l90-rj-c"),
+        _ => url.to_string(),
+    }
+}
+
+fn artist_in(json: &Value) -> ArtistPage {
+    let mut headers = Vec::new();
+    find_all(json, "musicImmersiveHeaderRenderer", &mut headers);
+    find_all(json, "musicVisualHeaderRenderer", &mut headers);
+    let header = headers.first().copied().unwrap_or(&Value::Null);
+    let name = runs_text(&header["title"]["runs"]);
+    let subtitle = runs_text(&header["monthlyListenerCount"]["runs"]);
+    let image = avatar_url(&last_thumbnail(&header["thumbnail"]));
+
+    // "Top songs" is the page's one list of song rows
+    let mut shelves = Vec::new();
+    find_all(json, "musicShelfRenderer", &mut shelves);
+    let songs = shelves.first().map(|s| tracks_in(s)).unwrap_or_default();
+
+    let mut albums: Vec<AlbumInfo> = Vec::new();
+    let mut carousels = Vec::new();
+    find_all(json, "musicCarouselShelfRenderer", &mut carousels);
+    for shelf in carousels {
+        let title = runs_text(&shelf["header"]["musicCarouselShelfBasicHeaderRenderer"]["title"]["runs"]);
+        if !matches!(title.as_str(), "Albums" | "Singles & EPs") {
+            continue;
+        }
+        for card in shelf["contents"].as_array().into_iter().flatten() {
+            let card = &card["musicTwoRowItemRenderer"];
+            let Some(id) = card["navigationEndpoint"]["browseEndpoint"]["browseId"].as_str().filter(|id| valid_album_id(id)) else { continue };
+            let item_title = runs_text(&card["title"]["runs"]);
+            if item_title.is_empty() || albums.iter().any(|a| a.id == id) {
+                continue;
+            }
+            let sub = runs_text(&card["subtitle"]["runs"]);
+            // albums are listed with just a year, singles already say "Single"
+            let subtitle = if sub.contains('•') || sub.is_empty() { sub } else { format!("Album • {sub}") };
+            albums.push(AlbumInfo { id: id.to_string(), title: item_title, subtitle, thumb: last_thumbnail(&card["thumbnailRenderer"]) });
+        }
+    }
+    ArtistPage { name, subtitle, image, songs, albums }
 }
 
 #[cfg(test)]
@@ -368,6 +481,89 @@ mod tests {
         assert_eq!(lists[0].subtitle, "Someone • 38 tracks");
         assert_eq!(lists[0].thumb, "https://lh3.googleusercontent.com/big");
         assert_eq!(lists[1].thumb, "");
+    }
+
+    fn song_row(video: &str, title: &str, artist_runs: Value) -> Value {
+        json!({ "musicResponsiveListItemRenderer": {
+            "playlistItemData": { "videoId": video },
+            "flexColumns": [
+                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": title }] } } },
+                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": artist_runs } } },
+                { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [{ "text": "1.2B plays" }] } } }
+            ]
+        } })
+    }
+
+    fn artist_link(name: &str, id: &str) -> Value {
+        json!({ "text": name, "navigationEndpoint": { "browseEndpoint": { "browseId": id } } })
+    }
+
+    #[test]
+    fn songs_know_their_first_artist() {
+        let both = json!([artist_link("Daft Punk", "UCRr1xG_2WIDs18a6cIiCxeA"), { "text": " & " }, artist_link("Julian", "UCWhpbdGLnR8XtXLr0yl2nYA")]);
+        let t = parse_track(&song_row("khnokW3Mw24", "Instant Crush", both)["musicResponsiveListItemRenderer"]).unwrap();
+        assert_eq!(t.artist_id, "UCRr1xG_2WIDs18a6cIiCxeA");
+        assert_eq!(t.channel, "Daft Punk & Julian");
+        // an album link is not an artist, and a row with no link has no artist page
+        let album_only = json!([{ "text": "Someone" }, artist_link("An album", "MPREb_K8qWMWVqXGi")]);
+        let t = parse_track(&song_row("abcdefghijk", "Song", album_only)["musicResponsiveListItemRenderer"]).unwrap();
+        assert_eq!(t.artist_id, "");
+    }
+
+    #[test]
+    fn parses_an_artist_page() {
+        let card = |id: &str, title: &str, sub: &str| {
+            json!({ "musicTwoRowItemRenderer": {
+                "title": { "runs": [{ "text": title }] },
+                "subtitle": { "runs": [{ "text": sub }] },
+                "navigationEndpoint": { "browseEndpoint": { "browseId": id } },
+                "thumbnailRenderer": { "musicThumbnailRenderer": { "thumbnail": { "thumbnails": [{ "url": "https://x/small" }, { "url": "https://x/cover" }] } } }
+            } })
+        };
+        let shelf = |title: &str, cards: Vec<Value>| {
+            json!({ "musicCarouselShelfRenderer": {
+                "header": { "musicCarouselShelfBasicHeaderRenderer": { "title": { "runs": [{ "text": title }] } } },
+                "contents": cards
+            } })
+        };
+        let page = json!({
+            "header": { "musicImmersiveHeaderRenderer": {
+                "title": { "runs": [{ "text": "Daft Punk" }] },
+                "monthlyListenerCount": { "runs": [{ "text": "67.8M monthly audience" }] },
+                "thumbnail": { "musicThumbnailRenderer": { "thumbnail": { "thumbnails": [
+                    { "url": "https://lh3.googleusercontent.com/abc=w1080-h450-p-l90-rj" }] } } }
+            } },
+            "contents": [
+                { "musicShelfRenderer": { "title": { "runs": [{ "text": "Top songs" }] }, "contents": [
+                    song_row("khnokW3Mw24", "Instant Crush", json!([artist_link("Daft Punk", "UCRr1xG_2WIDs18a6cIiCxeA")])),
+                    song_row("abcdefghijk", "Another", json!([artist_link("Daft Punk", "UCRr1xG_2WIDs18a6cIiCxeA")])) ] } },
+                shelf("Albums", vec![card("MPREb_OgeEnoHTsCm", "Random Access Memories", "2013"), card("MPREb_OgeEnoHTsCm", "dup", "2013")]),
+                shelf("Singles & EPs", vec![card("MPREb_X1DQ1j0PPrX", "GLBTM", "Single • 2023")]),
+                shelf("Videos", vec![card("MPREb_video", "a video", "Daft Punk • 907M views")]),
+                shelf("Fans might also like", vec![card("UCq7VAQmXDurV-9VN2bSFXvw", "Gesaffelstein", "23.9M monthly audience")]),
+            ]
+        });
+        let a = artist_in(&page);
+        assert_eq!(a.name, "Daft Punk");
+        assert_eq!(a.subtitle, "67.8M monthly audience");
+        assert_eq!(a.image, "https://lh3.googleusercontent.com/abc=w120-h120-l90-rj-c", "a small square crop");
+        assert_eq!(a.songs.len(), 2);
+        assert_eq!(a.songs[0].title, "Instant Crush");
+        let ids: Vec<&str> = a.albums.iter().map(|x| x.id.as_str()).collect();
+        assert_eq!(ids, ["MPREb_OgeEnoHTsCm", "MPREb_X1DQ1j0PPrX"], "only albums and singles, once each");
+        assert_eq!(a.albums[0].subtitle, "Album • 2013");
+        assert_eq!(a.albums[1].subtitle, "Single • 2023");
+        assert_eq!(a.albums[0].thumb, "https://x/cover");
+        // a page that isn't an artist's yields no name, which the client reports as an error
+        assert!(artist_in(&json!({ "contents": [] })).name.is_empty());
+    }
+
+    #[test]
+    fn only_youtube_music_ids_are_fetched() {
+        assert!(valid_album_id("MPREb_OgeEnoHTsCm"));
+        for bad in ["", "UCRr1xG_2WIDs18a6cIiCxeA", "MPREb/../x", "MPRE b"] {
+            assert!(!valid_album_id(bad), "{bad:?}");
+        }
     }
 
     #[test]

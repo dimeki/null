@@ -30,18 +30,38 @@ pub struct TrackInfo {
     pub channel: String,
     pub duration: u32,
     pub thumb: String,
+    pub artist_id: String,
 }
 
 impl From<&Track> for TrackInfo {
     fn from(t: &Track) -> Self {
-        TrackInfo { id: t.id.clone(), title: t.title.clone(), channel: t.channel.clone(), duration: t.duration, thumb: t.thumb.clone() }
+        TrackInfo {
+            id: t.id.clone(),
+            title: t.title.clone(),
+            channel: t.channel.clone(),
+            duration: t.duration,
+            thumb: t.thumb.clone(),
+            artist_id: t.artist_id.clone(),
+        }
     }
 }
 
 impl From<&TrackInfo> for Track {
     fn from(t: &TrackInfo) -> Self {
-        Track { id: t.id.clone(), title: t.title.clone(), channel: t.channel.clone(), duration: t.duration, thumb: t.thumb.clone() }
+        Track {
+            id: t.id.clone(),
+            title: t.title.clone(),
+            channel: t.channel.clone(),
+            duration: t.duration,
+            thumb: t.thumb.clone(),
+            artist_id: t.artist_id.clone(),
+        }
     }
+}
+
+/// Artist pages are fetched by this id, so a guest accepts only what YouTube Music issues
+pub fn valid_artist_id(id: &str) -> bool {
+    id.starts_with("UC") && (20..=30).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// Ids end up in a yt-dlp URL and a file name, so a guest only accepts what YouTube issues
@@ -55,7 +75,14 @@ fn clip(s: &str, max: usize) -> String {
 
 impl TrackInfo {
     fn to_json(&self) -> Value {
-        json!({ "id": self.id, "title": self.title, "channel": self.channel, "duration": self.duration, "thumb": self.thumb })
+        json!({
+            "id": self.id,
+            "title": self.title,
+            "channel": self.channel,
+            "duration": self.duration,
+            "thumb": self.thumb,
+            "artist": self.artist_id,
+        })
     }
 
     fn from_json(v: &Value) -> Option<TrackInfo> {
@@ -66,6 +93,7 @@ impl TrackInfo {
             channel: clip(v["channel"].as_str().unwrap_or(""), 200),
             duration: v["duration"].as_u64().unwrap_or(0).min(86_400) as u32,
             thumb: clip(v["thumb"].as_str().unwrap_or(""), 500),
+            artist_id: v["artist"].as_str().filter(|a| valid_artist_id(a)).unwrap_or("").to_string(),
         })
     }
 }
@@ -440,7 +468,20 @@ mod tests {
     use std::net::TcpListener;
 
     fn info(id: &str) -> TrackInfo {
-        TrackInfo { id: id.into(), title: "T".into(), channel: "C".into(), duration: 200, thumb: String::new() }
+        TrackInfo { id: id.into(), title: "T".into(), channel: "C".into(), duration: 200, thumb: String::new(), artist_id: String::new() }
+    }
+
+    #[test]
+    fn artist_ids_are_checked_like_video_ids() {
+        assert!(valid_artist_id("UCRr1xG_2WIDs18a6cIiCxeA"));
+        for bad in ["", "UC", "MPREb_OgeEnoHTsCm", "UC../../etc/passwd/xxxxxxx", "UCRr1xG 2WIDs18a6cIiCxeA"] {
+            assert!(!valid_artist_id(bad), "{bad:?}");
+        }
+        let v = json!({ "id": "abcdefghijk", "artist": "not-an-artist" });
+        assert_eq!(TrackInfo::from_json(&v).unwrap().artist_id, "");
+        let mut t = info("abcdefghijk");
+        t.artist_id = "UCRr1xG_2WIDs18a6cIiCxeA".into();
+        assert_eq!(TrackInfo::from_json(&t.to_json()).unwrap(), t);
     }
 
     fn state(playing: bool, pos: f64, ts: i64) -> HostState {
