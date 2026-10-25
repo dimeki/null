@@ -2,7 +2,7 @@ use crate::cookies;
 use crate::innertube::{Client, PlaylistInfo};
 use crate::lyrics::{self, Lyrics};
 use crate::mpv::{Mpv, PlayerEvent};
-use crate::party::{self, Correction, HostState, Out as PartyOut, TrackInfo};
+use crate::party::{self, Act, ActKind, Correction, HostState, Out as PartyOut, TrackInfo};
 use crate::update;
 use crate::ytdlp::{Track, YtDlp};
 use crate::{LyricLine, MainWindow, PartyMember, Theme, TrackItem};
@@ -91,6 +91,8 @@ pub enum Cmd {
     PartyHost,
     PartyJoin(String),
     PartyLeave,
+    /// The host lets guests control playback, or stops letting them
+    PartyControl(bool),
     Party(party::Event),
     SetPartyServer(String),
     SetDisplayName(String),
@@ -127,6 +129,8 @@ struct PartyState {
     saved_queue: Option<(Vec<Track>, Option<usize>)>,
     sync_text: String,
     last_check: Instant,
+    /// Shared control: the host allows guests to play, pause, skip, seek and add songs
+    control: bool,
 }
 
 /// Commands a guest cannot give: the host steers playback
@@ -465,12 +469,24 @@ impl Engine {
 
     fn handle_cmd(&mut self, cmd: Cmd) {
         if self.is_guest() && is_playback_control(&cmd) {
-            self.status = "Only the host controls playback".into();
+            let allowed = self.party.as_ref().is_some_and(|p| p.control);
+            self.status = match (allowed, self.guest_request(&cmd)) {
+                (true, Some(act)) => {
+                    if let Some(p) = self.party.as_ref() {
+                        p.handle.send(PartyOut::Act(act));
+                    }
+                    // nothing changes here until the host does it and the new state comes back
+                    "Sent to the host".into()
+                }
+                (true, None) => "Guests can play, pause, skip, seek and add songs".into(),
+                (false, _) => "Only the host controls playback".into(),
+            };
             self.sync();
             return;
         }
         match cmd {
             Cmd::PartyHost => self.party_host(),
+            Cmd::PartyControl(on) => self.set_party_control(on),
             Cmd::PartyJoin(code) => self.party_join(code),
             Cmd::PartyLeave => self.end_party(String::new()),
             Cmd::Party(event) => self.handle_party_event(event),
@@ -944,7 +960,91 @@ impl Engine {
             saved_queue: (role == PartyRole::Guest).then(|| (self.queue.clone(), self.cur)),
             sync_text: String::new(),
             last_check: Instant::now(),
+            control: false,
         }
+    }
+
+    /// What a guest's button press means as a request to the host, if shared control covers it
+    fn guest_request(&self, cmd: &Cmd) -> Option<Act> {
+        let current = self.cur.and_then(|c| self.queue.get(c));
+        let for_id = current.map(|t| t.id.clone()).unwrap_or_default();
+        let act = |kind, pos: Option<f64>, track: Option<&Track>| Act { kind, for_id: for_id.clone(), pos, track: track.map(TrackInfo::from) };
+        let host_playing = self.guest_host_playing();
+        Some(match cmd {
+            Cmd::TogglePause => act(if host_playing { ActKind::Pause } else { ActKind::Play }, None, None),
+            Cmd::Resume => act(ActKind::Play, None, None),
+            Cmd::PausePlayback => act(ActKind::Pause, None, None),
+            Cmd::Next => act(ActKind::Next, None, None),
+            Cmd::Prev => act(ActKind::Prev, None, None),
+            Cmd::SeekFraction(f) => act(ActKind::Seek, Some(f.clamp(0.0, 1.0) as f64 * current?.duration as f64), None),
+            Cmd::SeekSecs(s) => act(ActKind::Seek, Some(*s), None),
+            // a guest has no queue of their own, so "play this" can only mean "add this"
+            Cmd::PlayResult(i) | Cmd::AddResult(i) => act(ActKind::Add, None, Some(self.results.get(*i)?)),
+            Cmd::PlayPlaylistTrack(i) | Cmd::AddPlaylistTrack(i) => act(ActKind::Add, None, Some(self.playlist_tracks.get(*i)?)),
+            _ => return None,
+        })
+    }
+
+    fn set_party_control(&mut self, on: bool) {
+        let Some(p) = self.party.as_mut().filter(|p| p.role == PartyRole::Host && p.ready) else { return };
+        p.control = on;
+        p.handle.send(PartyOut::Control(on));
+        self.push_party();
+    }
+
+    /// The host carries out what a guest asked for, through the same code the host's own buttons use
+    fn host_act(&mut self, from: String, act: Act) {
+        if !self.party.as_ref().is_some_and(|p| p.role == PartyRole::Host && p.control) {
+            return;
+        }
+        let current = self.cur.and_then(|c| self.queue.get(c)).map(|t| t.id.clone()).unwrap_or_default();
+        // a request about a song that is already over (two people skipping at once) is stale
+        let fresh = act.for_id == current;
+        let note = match act.kind {
+            ActKind::Play => {
+                self.handle_cmd(Cmd::Resume);
+                "pressed play".to_string()
+            }
+            ActKind::Pause => {
+                self.handle_cmd(Cmd::PausePlayback);
+                "paused".to_string()
+            }
+            ActKind::Next if fresh => {
+                self.handle_cmd(Cmd::Next);
+                "skipped to the next song".to_string()
+            }
+            ActKind::Prev if fresh => {
+                self.handle_cmd(Cmd::Prev);
+                "went back".to_string()
+            }
+            ActKind::Seek if fresh => {
+                let secs = act.pos.unwrap_or(0.0);
+                if self.playing {
+                    self.handle_cmd(Cmd::SeekSecs(secs));
+                } else if self.cur.is_some() {
+                    self.resume_pos = Some(secs);
+                    self.push_progress();
+                    if let Some(p) = self.party.as_mut() {
+                        p.force = true;
+                    }
+                }
+                "moved the song".to_string()
+            }
+            ActKind::Add => match act.track.as_ref().map(Track::from) {
+                // the same song twice in a row is a double click, not two requests
+                Some(track) if !self.queue.iter().skip(self.cur.map_or(0, |c| c + 1)).any(|t| t.id == track.id) && track.id != current => {
+                    let title = track.title.clone();
+                    self.enqueue(vec![track]);
+                    format!("added {title}")
+                }
+                _ => return,
+            },
+            _ => return,
+        };
+        // shown under the song title, not as the red party error line
+        self.status = format!("{from} {note}");
+        self.sync();
+        self.push_party();
     }
 
     fn party_host(&mut self) {
@@ -1001,6 +1101,12 @@ impl Engine {
                 }
             }
             Event::State(host_state) => self.apply_host_state(host_state),
+            Event::Control(on) => {
+                if let Some(p) = self.party.as_mut().filter(|p| p.role == PartyRole::Guest) {
+                    p.control = on;
+                }
+            }
+            Event::Act { from, act } => self.host_act(from, act),
             Event::Hello => {
                 if let Some(p) = self.party.as_mut() {
                     p.force = true;
@@ -1033,6 +1139,10 @@ impl Engine {
         }
         if let Some(p) = self.party.as_mut() {
             p.last_host = Some(host.clone());
+        }
+        // the host answered whatever this guest asked for
+        if self.status == "Sent to the host" {
+            self.status.clear();
         }
         let Some(track) = host.track.as_ref().map(Track::from) else {
             // the host has nothing playing
@@ -1192,8 +1302,10 @@ impl Engine {
                 p.sync_text.clone(),
             ),
         };
-        let locked = mode == 2;
+        let control = self.party.as_ref().is_some_and(|p| p.control);
+        let locked = mode == 2 && !control;
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
+            ui.set_party_control(control);
             ui.set_party_mode(mode);
             ui.set_party_connecting(connecting);
             ui.set_party_room(room.into());

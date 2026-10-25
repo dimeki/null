@@ -380,3 +380,83 @@ Deno.test({
       guest.close();
     }),
 });
+
+Deno.test({
+  name: "shared control: guests can only act while the host allows it, and the host receives the request",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: () =>
+    withRelay(async (port) => {
+      const host = await Client.connect(port);
+      host.send({ t: "create", name: "Host" });
+      const { room } = await host.next("created") as { room: string };
+      const guest = await Client.connect(port);
+      guest.send({ t: "join", room, name: "Guest" });
+      await guest.next("joined");
+      await host.next("hello");
+
+      // off by default: the request is refused and the host never hears of it
+      guest.send({ t: "act", a: "next", for: "abcdefghijk" });
+      assertEquals((await guest.next("error")).message, "The host hasn't turned on shared control");
+      await host.expectNothing("act");
+
+      // a guest cannot switch it on
+      guest.send({ t: "control", on: true });
+      await guest.expectNothing("control");
+
+      host.send({ t: "control", on: true });
+      assertEquals((await guest.next("control")).on, true);
+
+      guest.send({ t: "act", a: "next", for: "abcdefghijk", sneaky: "dropped" });
+      assertEquals(await host.next("act"), { t: "act", from: "Guest", a: "next", for: "abcdefghijk" });
+      guest.send({ t: "act", a: "seek", for: "abcdefghijk", pos: 42.5 });
+      assertEquals((await host.next("act")).pos, 42.5);
+      const track = { id: "abcdefghijk", title: "T" };
+      guest.send({ t: "act", a: "add", track });
+      assertEquals((await host.next("act")).track, track);
+
+      await new Promise((r) => setTimeout(r, 1100)); // a new rate-limit window
+      // junk is dropped quietly
+      guest.send({ t: "act", a: "format-disk" });
+      guest.send({ t: "act", a: "add" });
+      guest.send({ t: "act", a: "seek", pos: "soon" });
+      await host.next("act"); // the seek, now without a position
+      await host.expectNothing("act");
+
+      // someone who joins later is told control is on
+      const late = await Client.connect(port);
+      late.send({ t: "join", room, name: "Late" });
+      await late.next("joined");
+      assertEquals((await late.next("control")).on, true);
+
+      host.send({ t: "control", on: false });
+      assertEquals((await guest.next("control")).on, false);
+      guest.send({ t: "act", a: "pause" });
+      await guest.next("error");
+      host.close();
+      guest.close();
+      late.close();
+    }),
+});
+
+Deno.test({
+  name: "shared control: a guest cannot flood the host with requests",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: () =>
+    withRelay(async (port) => {
+      const host = await Client.connect(port);
+      host.send({ t: "create", name: "Host" });
+      const { room } = await host.next("created") as { room: string };
+      host.send({ t: "control", on: true });
+      const guest = await Client.connect(port);
+      guest.send({ t: "join", room, name: "Guest" });
+      await guest.next("joined");
+      for (let i = 0; i < 30; i++) guest.send({ t: "act", a: "pause" });
+      await new Promise((r) => setTimeout(r, 400));
+      const received = host.inbox.filter((m) => m.t === "act").length;
+      assert(received > 0 && received <= 5, `only a few requests per second get through, got ${received}`);
+      host.close();
+      guest.close();
+    }),
+});

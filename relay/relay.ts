@@ -13,6 +13,9 @@
 //                     join {room, name}                         joined {room, you, host}
 //                     state {...}  (host only)                  state {...}    (to every guest)
 //                     status {sync}  (guest only)               members {members:[{id,name,host,sync}]}
+//                     control {on}  (host only)                 control {on}   (to every guest, and to each new guest)
+//                     act {a, for, pos, track}  (guest only)   act {from, a, for, pos, track}  (to the host, only while control is on)
+//                       a is one of play, pause, next, prev, seek, add
 //                     leave
 //                                                               hello         (to the host: a guest joined, resend state)
 //                                                               closed {reason}
@@ -24,6 +27,8 @@ const MAX_ROOMS = 500;
 const MAX_GUESTS = 25;
 const MAX_MESSAGE_CHARS = 64 * 1024;
 const MAX_STATES_PER_SECOND = 8;
+const MAX_ACTS_PER_SECOND = 4;
+const ACTIONS = new Set(["play", "pause", "next", "prev", "seek", "add"]);
 const MAX_NAME_CHARS = 24;
 
 /** Limits that protect a public relay. Tests tighten or loosen them through startRelay. */
@@ -68,6 +73,8 @@ interface Room {
   guests: Map<string, Member>;
   /** The host's latest "state" message, replayed to people who join late */
   lastState: string | null;
+  /** The host lets guests play, pause, skip, seek and add songs */
+  control: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -103,6 +110,8 @@ function handle(socket: WebSocket, ip: string) {
   let room: Room | null = null;
   let windowStart = 0;
   let statesInWindow = 0;
+  let actWindowStart = 0;
+  let actsInWindow = 0;
 
   // drop connections that have gone quiet (a dead client never says goodbye)
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -161,7 +170,7 @@ function handle(socket: WebSocket, ip: string) {
           return send(socket, { t: "error", message: "Too many parties started from your network. Try again in a minute." });
         }
         me = { id: crypto.randomUUID(), name: cleanName(msg.name), socket, isHost: true, sync: "" };
-        room = { code: newCode(), host: me, guests: new Map(), lastState: null };
+        room = { code: newCode(), host: me, guests: new Map(), lastState: null, control: false };
         rooms.set(room.code, room);
         send(socket, { t: "created", room: room.code, you: me.id });
         broadcastMembers(room);
@@ -179,6 +188,7 @@ function handle(socket: WebSocket, ip: string) {
         room.guests.set(me.id, me);
         send(socket, { t: "joined", room: room.code, you: me.id, host: room.host.name });
         if (room.lastState) socket.send(room.lastState);
+        if (room.control) send(socket, { t: "control", on: true });
         broadcastMembers(room);
         // the stored state may be stale by now, so ask the host for a fresh one
         send(room.host.socket, { t: "hello" });
@@ -198,6 +208,39 @@ function handle(socket: WebSocket, ip: string) {
         for (const g of room.guests.values()) {
           if (g.socket.readyState === WebSocket.OPEN) g.socket.send(forwarded);
         }
+        break;
+      }
+
+      case "control": {
+        // the host switches shared control on or off, and every guest is told
+        if (!me?.isHost || !room) return;
+        const on = msg.on === true;
+        if (on === room.control) return;
+        room.control = on;
+        for (const g of room.guests.values()) send(g.socket, { t: "control", on });
+        break;
+      }
+
+      case "act": {
+        // a guest asks the host to do something; the host's app decides and the result
+        // reaches everyone through the normal "state" message
+        if (!me || me.isHost || !room) return;
+        if (!room.control) return send(socket, { t: "error", message: "The host hasn't turned on shared control" });
+        const now = Date.now();
+        if (now - actWindowStart > 1000) {
+          actWindowStart = now;
+          actsInWindow = 0;
+        }
+        if (++actsInWindow > MAX_ACTS_PER_SECOND) return;
+        if (typeof msg.a !== "string" || !ACTIONS.has(msg.a)) return;
+        const forwarded: Record<string, unknown> = { t: "act", from: me.name, a: msg.a };
+        if (typeof msg.for === "string") forwarded.for = msg.for.slice(0, 20);
+        if (typeof msg.pos === "number" && Number.isFinite(msg.pos)) forwarded.pos = msg.pos;
+        if (msg.a === "add") {
+          if (typeof msg.track !== "object" || msg.track === null || Array.isArray(msg.track)) return;
+          forwarded.track = msg.track;
+        }
+        send(room.host.socket, forwarded);
         break;
       }
 

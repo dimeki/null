@@ -116,12 +116,76 @@ pub struct Member {
     pub sync: String,
 }
 
+/// What a guest may ask the host to do while shared control is on
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ActKind {
+    Play,
+    Pause,
+    Next,
+    Prev,
+    Seek,
+    Add,
+}
+
+impl ActKind {
+    fn name(self) -> &'static str {
+        match self {
+            ActKind::Play => "play",
+            ActKind::Pause => "pause",
+            ActKind::Next => "next",
+            ActKind::Prev => "prev",
+            ActKind::Seek => "seek",
+            ActKind::Add => "add",
+        }
+    }
+
+    fn parse(name: &str) -> Option<ActKind> {
+        [ActKind::Play, ActKind::Pause, ActKind::Next, ActKind::Prev, ActKind::Seek, ActKind::Add].into_iter().find(|k| k.name() == name)
+    }
+}
+
+/// A guest's request. `for_id` is the song the guest was looking at, so a skip that
+/// arrives after the song already changed (two people pressing Next) is ignored.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Act {
+    pub kind: ActKind,
+    pub for_id: String,
+    pub pos: Option<f64>,
+    pub track: Option<TrackInfo>,
+}
+
+impl Act {
+    fn to_json(&self) -> Value {
+        let mut v = json!({ "t": "act", "a": self.kind.name(), "for": self.for_id });
+        if let Some(pos) = self.pos {
+            v["pos"] = json!(pos);
+        }
+        if let Some(track) = &self.track {
+            v["track"] = track.to_json();
+        }
+        v
+    }
+
+    fn from_json(v: &Value) -> Option<Act> {
+        Some(Act {
+            kind: ActKind::parse(v["a"].as_str()?)?,
+            for_id: clip(v["for"].as_str().unwrap_or(""), 20),
+            pos: v["pos"].as_f64().filter(|p| p.is_finite()).map(|p| p.clamp(0.0, 86_400.0)),
+            track: v["track"].is_object().then(|| TrackInfo::from_json(&v["track"])).flatten(),
+        })
+    }
+}
+
 pub enum Out {
     Create(String),
     Join { room: String, name: String },
     State(HostState),
     /// A guest's report of how well it is keeping up
     Status(String),
+    /// The host lets guests control playback (or stops letting them)
+    Control(bool),
+    /// A guest asks the host to do something
+    Act(Act),
     Leave,
 }
 
@@ -132,6 +196,8 @@ impl Out {
             Out::Join { room, name } => json!({ "t": "join", "room": room, "name": name }),
             Out::State(s) => s.to_json(),
             Out::Status(sync) => json!({ "t": "status", "sync": sync }),
+            Out::Control(on) => json!({ "t": "control", "on": on }),
+            Out::Act(act) => act.to_json(),
             Out::Leave => json!({ "t": "leave" }),
         }
     }
@@ -142,6 +208,10 @@ pub enum Event {
     Joined { room: String, host: String },
     Members(Vec<Member>),
     State(HostState),
+    /// Guests: the host allows (or no longer allows) controlling playback
+    Control(bool),
+    /// The host: a guest asks for something
+    Act { from: String, act: Act },
     /// A guest joined: send a fresh state
     Hello,
     Closed(String),
@@ -355,6 +425,8 @@ fn handle_message(text: &str, clock: &mut ClockSync, offset: &AtomicI64) -> Opti
                 .collect(),
         )),
         "state" => HostState::from_json(&v).map(Event::State),
+        "control" => Some(Event::Control(v["on"].as_bool()?)),
+        "act" => Some(Event::Act { from: clip(v["from"].as_str().unwrap_or("Guest"), 40), act: Act::from_json(&v)? }),
         "hello" => Some(Event::Hello),
         "closed" => Some(Event::Closed(clip(v["reason"].as_str().unwrap_or("The party ended"), 120))),
         "error" => Some(Event::Error(clip(v["message"].as_str().unwrap_or("Something went wrong"), 120))),
@@ -436,6 +508,26 @@ mod tests {
         assert!(list[0].host && list[0].sync.is_empty());
         assert_eq!(list[1].sync, "Catching up…");
         assert_eq!(Out::Status("In sync".into()).to_json(), json!({ "t": "status", "sync": "In sync" }));
+    }
+
+    #[test]
+    fn shared_control_messages_round_trip() {
+        let add = Act { kind: ActKind::Add, for_id: String::new(), pos: None, track: Some(info("abcdefghijk")) };
+        assert_eq!(Act::from_json(&add.to_json()).unwrap(), add);
+        let seek = Act { kind: ActKind::Seek, for_id: "abcdefghijk".into(), pos: Some(42.5), track: None };
+        assert_eq!(Act::from_json(&seek.to_json()).unwrap(), seek);
+        assert_eq!(Out::Control(true).to_json(), json!({ "t": "control", "on": true }));
+
+        let mut clock = ClockSync::default();
+        let off = AtomicI64::new(0);
+        let msg = r#"{"t":"act","from":"Ana","a":"next","for":"abcdefghijk"}"#;
+        let Some(Event::Act { from, act }) = handle_message(msg, &mut clock, &off) else { panic!("expected an act") };
+        assert_eq!((from.as_str(), act.kind), ("Ana", ActKind::Next));
+        assert!(matches!(handle_message(r#"{"t":"control","on":true}"#, &mut clock, &off), Some(Event::Control(true))));
+        // unknown actions, and tracks with unsafe ids, are not accepted
+        assert!(handle_message(r#"{"t":"act","from":"x","a":"format-disk"}"#, &mut clock, &off).is_none());
+        let sneaky = Act::from_json(&json!({ "a": "add", "track": { "id": "../../etc/passwd" } })).unwrap();
+        assert!(sneaky.track.is_none());
     }
 
     #[test]

@@ -144,6 +144,10 @@ fn main() -> Result<(), slint::PlatformError> {
         let _ = t.send(Cmd::PartyJoin(code.to_string()));
     });
     let t = tx.clone();
+    ui.on_party_control_changed(move |on| {
+        let _ = t.send(Cmd::PartyControl(on));
+    });
+    let t = tx.clone();
     ui.on_party_leave(move || {
         let _ = t.send(Cmd::PartyLeave);
     });
