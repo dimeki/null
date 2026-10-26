@@ -32,7 +32,7 @@ export component PlayerBar inherits Rectangle {
                 font-weight: 500;
                 overflow: elide;
             }
-            if AppState.now-artist-id == "": Text {
+            if AppState.now-artist-id == "" && AppState.now-detail != "": Text {
                 text: AppState.now-detail;
                 color: Theme.text2;
                 font-size: 12px;

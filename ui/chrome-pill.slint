@@ -39,7 +39,7 @@ export component PlayerPill inherits Rectangle {
                     font-weight: 500;
                     overflow: elide;
                 }
-                if AppState.now-artist-id == "": Text {
+                if AppState.now-artist-id == "" && AppState.now-detail != "": Text {
                     text: AppState.now-detail;
                     color: Theme.text2;
                     font-size: 12px;
@@ -121,7 +121,10 @@ export component PlayerPill inherits Rectangle {
                 horizontal-alignment: right;
                 min-width: 32px;
             }
-            // volume
+            // volume, set apart a little from the end time
+            Rectangle {
+                width: 10px;
+            }
             HorizontalLayout {
                 spacing: 5px;
                 min-width: 108px;

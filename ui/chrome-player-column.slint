@@ -27,7 +27,7 @@ export component PlayerColumn inherits Rectangle {
             height: 44px;
             vertical-alignment: bottom;
         }
-        if AppState.now-artist-id == "": Text {
+        if AppState.now-artist-id == "" && AppState.now-detail != "": Text {
             text: AppState.now-detail;
             color: Theme.text2;
             font-size: 12px;
