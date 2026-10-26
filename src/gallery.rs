@@ -230,6 +230,12 @@ fn scenes() -> Vec<Scene> {
             ui.global::<AppState>().set_playlist_title("Gym playlist".into());
             ui.global::<AppState>().set_playlist_tracks(model(songs()));
         }),
+        ("library-playlist-loading", |ui| {
+            ui.global::<AppState>().set_tab(1);
+            ui.global::<AppState>().set_in_playlist(true);
+            ui.global::<AppState>().set_playlist_title("Liked songs".into());
+            ui.global::<AppState>().set_playlist_loading(true);
+        }),
         ("artist", |ui| {
             ui.global::<AppState>().set_artist_open(true);
             ui.global::<AppState>().set_artist_name("Artist name".into());

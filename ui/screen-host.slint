@@ -58,7 +58,8 @@ export component ScreenHost inherits Rectangle {
     LoadingLine {
         busy: AppState.busy;
         x: 0px;
-        y: 0px;
+        // in the gap above the content, not on top of its first row
+        y: -6px;
         width: parent.width;
     }
 }
