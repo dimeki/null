@@ -1,0 +1,45 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "components.slint";
+import { AppState } from "state.slint";
+
+export component UpdateBanner inherits Rectangle {
+    height: 40px;
+    border-radius: 8px;
+    background: Theme.accent-bg;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: "Version " + AppState.update-version + " is available" + (AppState.update-notes != "" ? " · " + AppState.update-notes : "");
+                font-size: 12px;
+                color: Theme.text;
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            TextButton {
+                label: "Get update";
+                clicked => {
+                    AppState.open-update();
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                glyph: Glyphs.close;
+                size: 24px;
+                tip: "Dismiss";
+                tip-below: true;
+                clicked => {
+                    AppState.update-dismissed = true;
+                }
+            }
+        }
+    }
+}

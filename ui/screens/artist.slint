@@ -1,0 +1,161 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "../theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "../components.slint";
+import { AppState } from "../state.slint";
+
+export component ScreenArtist inherits VerticalLayout {
+    spacing: 10px;
+    vertical-stretch: 1;
+    HorizontalLayout {
+        height: 30px;
+        TextButton {
+            label: "Back";
+            clicked => {
+                AppState.artist-back();
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+    }
+    HorizontalLayout {
+        height: 72px;
+        spacing: 14px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                min-width: 72px;
+                max-width: 72px;
+                min-height: 72px;
+                max-height: 72px;
+                border-radius: 8px;
+                background: Theme.border;
+                clip: true;
+                if AppState.artist-image.width > 0 && !Theme.perf: Image {
+                    source: AppState.artist-image;
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if AppState.artist-image.width == 0 || Theme.perf: Icon {
+                    glyph: Glyphs.music;
+                    tint: Theme.text3;
+                    width: 26px;
+                    height: 26px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: AppState.artist-name;
+                font-size: 20px;
+                font-weight: 500;
+                color: Theme.text;
+                overflow: elide;
+            }
+            Text {
+                text: AppState.artist-sub;
+                font-size: 12px;
+                color: Theme.text2;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                padding-top: 6px;
+                spacing: 8px;
+                TextButton {
+                    label: "Play all";
+                    primary: true;
+                    clicked => {
+                        AppState.play-all();
+                    }
+                }
+                TextButton {
+                    label: "Add all";
+                    clicked => {
+                        AppState.add-all();
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+            }
+        }
+    }
+    Rectangle {
+        vertical-stretch: 1;
+        ScrollList {
+            VerticalLayout {
+                spacing: 2px;
+                alignment: start;
+                if AppState.playlist-tracks.length > 0: Text {
+                    text: AppState.artist-album ? "Tracks" : "Top songs";
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: Theme.text2;
+                    height: 26px;
+                    vertical-alignment: center;
+                }
+                for item[i] in AppState.playlist-tracks: TrackRow {
+                    menu: true;
+                    menu-add: true;
+                    menu-play-next => {
+                        AppState.play-next-playlist-track(i);
+                    }
+                    menu-add-clicked => {
+                        AppState.add-playlist-track(i);
+                    }
+                    menu-copy-link(url) => {
+                        AppState.copy-text(url);
+                    }
+                    menu-open-web(id) => {
+                        AppState.open-track-web(id);
+                    }
+                    item: item;
+                    action-glyph: Glyphs.plus;
+                    action-tip: "Add to queue";
+                    hover-intent => {
+                        AppState.prefetch-playlist-track(i);
+                    }
+                    activated => {
+                        AppState.play-playlist-track(i);
+                    }
+                    action => {
+                        AppState.add-playlist-track(i);
+                    }
+                    artist-clicked(id) => {
+                        AppState.open-artist(id);
+                    }
+                }
+                if AppState.artist-albums.length > 0 && !AppState.artist-album: Text {
+                    text: "Albums and singles";
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: Theme.text2;
+                    height: 40px;
+                    vertical-alignment: bottom;
+                }
+                if !AppState.artist-album: VerticalLayout {
+                    spacing: 2px;
+                    for item[i] in AppState.artist-albums: TrackRow {
+                        item: item;
+                        playable: false;
+                        activated => {
+                            AppState.open-album(i);
+                        }
+                    }
+                }
+            }
+        }
+        if AppState.artist-loading || AppState.artist-note != "": Text {
+            text: AppState.artist-loading ? "Loading…" : AppState.artist-note;
+            color: Theme.text3;
+            font-size: 14px;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

@@ -6,7 +6,7 @@
 //! plus an index.html to look at them all together. It draws into memory, so no window
 //! appears and nothing is clicked. Use it after changing the interface to see every screen at once.
 
-use crate::{LyricLine, MainWindow, PartyMember, Theme, TrackItem};
+use crate::{AppState, LyricLine, MainWindow, PartyMember, Theme, TrackItem};
 use slint::platform::software_renderer::{MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType};
 use slint::platform::{Platform, WindowAdapter};
 use slint::{ComponentHandle, Image, ModelRc, PhysicalSize, Rgba8Pixel, SharedPixelBuffer, VecModel};
@@ -133,60 +133,60 @@ fn lyric_lines() -> Vec<LyricLine> {
 
 /// Puts every property back to an ordinary "signed in, a song playing" state
 fn base(ui: &MainWindow) {
-    ui.set_tab(0);
-    ui.set_settings_open(false);
-    ui.set_artist_open(false);
-    ui.set_artist_album(false);
-    ui.set_artist_loading(false);
-    ui.set_artist_note("".into());
-    ui.set_in_playlist(false);
-    ui.set_query("".into());
-    ui.set_results(model(vec![]));
-    ui.set_search_note("".into());
-    ui.set_searching(false);
-    ui.set_queue(model(songs().into_iter().take(4).collect()));
-    ui.set_current_index(0);
-    ui.set_now_title("Song title one".into());
-    ui.set_now_detail("Artist · Album name".into());
-    ui.set_now_artist("Artist".into());
-    ui.set_now_rest("Album name".into());
-    ui.set_now_artist_id(ARTIST.into());
-    ui.set_now_cover(covers()[0].clone());
-    ui.set_active(true);
-    ui.set_paused(false);
-    ui.set_loading(false);
-    ui.set_shuffle(false);
-    ui.set_repeat_mode(0);
-    ui.set_pos_text("1:12".into());
-    ui.set_dur_text("3:42".into());
-    ui.set_duration_secs(222.0);
-    ui.set_progress(0.32);
-    ui.set_volume(0.8);
-    ui.set_signed_in(true);
-    ui.set_playlists(model(playlists()));
-    ui.set_playlist_tracks(model(vec![]));
-    ui.set_playlist_title("".into());
-    ui.set_playlist_loading(false);
-    ui.set_lyrics_lines(ModelRc::new(VecModel::from(lyric_lines())));
-    ui.set_lyrics_synced(true);
-    ui.set_lyrics_current(2);
-    ui.set_lyrics_source("Lyrics from LRCLIB".into());
-    ui.set_lyrics_loading(false);
-    ui.set_lyrics_note("".into());
-    ui.set_perf_mode(false);
-    ui.set_cache_text("13 MB of downloaded songs".into());
-    ui.set_ytdlp_version("2026.10.21".into());
-    ui.set_party_mode(0);
-    ui.set_party_connecting(false);
-    ui.set_party_room("".into());
-    ui.set_party_note("".into());
-    ui.set_party_control(false);
-    ui.set_controls_locked(false);
-    ui.set_app_version("1.0.3".into());
-    ui.set_update_available(false);
-    ui.set_party_server_ready(true);
-    ui.set_party_server_built_in(true);
-    ui.set_display_name("Giovanni".into());
+    ui.global::<AppState>().set_tab(0);
+    ui.global::<AppState>().set_settings_open(false);
+    ui.global::<AppState>().set_artist_open(false);
+    ui.global::<AppState>().set_artist_album(false);
+    ui.global::<AppState>().set_artist_loading(false);
+    ui.global::<AppState>().set_artist_note("".into());
+    ui.global::<AppState>().set_in_playlist(false);
+    ui.global::<AppState>().set_query("".into());
+    ui.global::<AppState>().set_results(model(vec![]));
+    ui.global::<AppState>().set_search_note("".into());
+    ui.global::<AppState>().set_searching(false);
+    ui.global::<AppState>().set_queue(model(songs().into_iter().take(4).collect()));
+    ui.global::<AppState>().set_current_index(0);
+    ui.global::<AppState>().set_now_title("Song title one".into());
+    ui.global::<AppState>().set_now_detail("Artist · Album name".into());
+    ui.global::<AppState>().set_now_artist("Artist".into());
+    ui.global::<AppState>().set_now_rest("Album name".into());
+    ui.global::<AppState>().set_now_artist_id(ARTIST.into());
+    ui.global::<AppState>().set_now_cover(covers()[0].clone());
+    ui.global::<AppState>().set_active(true);
+    ui.global::<AppState>().set_paused(false);
+    ui.global::<AppState>().set_loading(false);
+    ui.global::<AppState>().set_shuffle(false);
+    ui.global::<AppState>().set_repeat_mode(0);
+    ui.global::<AppState>().set_pos_text("1:12".into());
+    ui.global::<AppState>().set_dur_text("3:42".into());
+    ui.global::<AppState>().set_duration_secs(222.0);
+    ui.global::<AppState>().set_progress(0.32);
+    ui.global::<AppState>().set_volume(0.8);
+    ui.global::<AppState>().set_signed_in(true);
+    ui.global::<AppState>().set_playlists(model(playlists()));
+    ui.global::<AppState>().set_playlist_tracks(model(vec![]));
+    ui.global::<AppState>().set_playlist_title("".into());
+    ui.global::<AppState>().set_playlist_loading(false);
+    ui.global::<AppState>().set_lyrics_lines(ModelRc::new(VecModel::from(lyric_lines())));
+    ui.global::<AppState>().set_lyrics_synced(true);
+    ui.global::<AppState>().set_lyrics_current(2);
+    ui.global::<AppState>().set_lyrics_source("Lyrics from LRCLIB".into());
+    ui.global::<AppState>().set_lyrics_loading(false);
+    ui.global::<AppState>().set_lyrics_note("".into());
+    ui.global::<AppState>().set_perf_mode(false);
+    ui.global::<AppState>().set_cache_text("13 MB of downloaded songs".into());
+    ui.global::<AppState>().set_ytdlp_version("2026.10.21".into());
+    ui.global::<AppState>().set_party_mode(0);
+    ui.global::<AppState>().set_party_connecting(false);
+    ui.global::<AppState>().set_party_room("".into());
+    ui.global::<AppState>().set_party_note("".into());
+    ui.global::<AppState>().set_party_control(false);
+    ui.global::<AppState>().set_controls_locked(false);
+    ui.global::<AppState>().set_app_version("1.0.3".into());
+    ui.global::<AppState>().set_update_available(false);
+    ui.global::<AppState>().set_party_server_ready(true);
+    ui.global::<AppState>().set_party_server_built_in(true);
+    ui.global::<AppState>().set_display_name("Giovanni".into());
 }
 
 fn members(guests: &[(&str, &str)]) -> ModelRc<PartyMember> {
@@ -202,87 +202,88 @@ type Scene = (&'static str, fn(&MainWindow));
 fn scenes() -> Vec<Scene> {
     vec![
         ("search", |ui| {
-            ui.set_query("artist name".into());
-            ui.set_results(model(songs()));
+            ui.global::<AppState>().set_query("artist name".into());
+            ui.global::<AppState>().set_results(model(songs()));
         }),
         ("search-empty", |_| {}),
         ("search-update-banner", |ui| {
-            ui.set_query("artist name".into());
-            ui.set_results(model(songs()));
-            ui.set_update_available(true);
-            ui.set_update_version("1.0.4".into());
-            ui.set_update_notes("A short line about what changed".into());
-            ui.set_update_host("github.com".into());
+            ui.global::<AppState>().set_query("artist name".into());
+            ui.global::<AppState>().set_results(model(songs()));
+            ui.global::<AppState>().set_update_available(true);
+            ui.global::<AppState>().set_update_version("1.0.4".into());
+            ui.global::<AppState>().set_update_notes("A short line about what changed".into());
+            ui.global::<AppState>().set_update_host("github.com".into());
         }),
-        ("library", |ui| ui.set_tab(1)),
+        ("library", |ui| ui.global::<AppState>().set_tab(1)),
         ("library-signed-out", |ui| {
-            ui.set_tab(1);
-            ui.set_signed_in(false);
+            ui.global::<AppState>().set_tab(1);
+            ui.global::<AppState>().set_signed_in(false);
         }),
         ("library-playlist", |ui| {
-            ui.set_tab(1);
-            ui.set_in_playlist(true);
-            ui.set_playlist_title("Gym playlist".into());
-            ui.set_playlist_tracks(model(songs()));
+            ui.global::<AppState>().set_tab(1);
+            ui.global::<AppState>().set_in_playlist(true);
+            ui.global::<AppState>().set_playlist_title("Gym playlist".into());
+            ui.global::<AppState>().set_playlist_tracks(model(songs()));
         }),
         ("artist", |ui| {
-            ui.set_artist_open(true);
-            ui.set_artist_name("Artist name".into());
-            ui.set_artist_sub("67.8M monthly audience".into());
-            ui.set_artist_image(covers()[0].clone());
-            ui.set_playlist_tracks(model(songs().into_iter().take(5).collect()));
-            ui.set_artist_albums(model(albums()));
+            ui.global::<AppState>().set_artist_open(true);
+            ui.global::<AppState>().set_artist_name("Artist name".into());
+            ui.global::<AppState>().set_artist_sub("67.8M monthly audience".into());
+            ui.global::<AppState>().set_artist_image(covers()[0].clone());
+            ui.global::<AppState>().set_playlist_tracks(model(songs().into_iter().take(5).collect()));
+            ui.global::<AppState>().set_artist_albums(model(albums()));
         }),
         ("album", |ui| {
-            ui.set_artist_open(true);
-            ui.set_artist_album(true);
-            ui.set_artist_name("Album name".into());
-            ui.set_artist_sub("Artist · Album • 2023".into());
-            ui.set_artist_image(covers()[1].clone());
-            ui.set_playlist_tracks(model(songs()));
+            ui.global::<AppState>().set_artist_open(true);
+            ui.global::<AppState>().set_artist_album(true);
+            ui.global::<AppState>().set_artist_name("Album name".into());
+            ui.global::<AppState>().set_artist_sub("Artist · Album • 2023".into());
+            ui.global::<AppState>().set_artist_image(covers()[1].clone());
+            ui.global::<AppState>().set_playlist_tracks(model(songs()));
         }),
-        ("lyrics", |ui| ui.set_tab(2)),
+        ("lyrics", |ui| ui.global::<AppState>().set_tab(2)),
         ("lyrics-none", |ui| {
-            ui.set_tab(2);
-            ui.set_lyrics_lines(ModelRc::new(VecModel::from(Vec::<LyricLine>::new())));
-            ui.set_lyrics_note("No lyrics found for this song".into());
+            ui.global::<AppState>().set_tab(2);
+            ui.global::<AppState>().set_lyrics_lines(ModelRc::new(VecModel::from(Vec::<LyricLine>::new())));
+            ui.global::<AppState>().set_lyrics_note("No lyrics found for this song".into());
         }),
-        ("party", |ui| ui.set_tab(3)),
+        ("party", |ui| ui.global::<AppState>().set_tab(3)),
         ("party-host", |ui| {
-            ui.set_tab(3);
-            ui.set_party_mode(1);
-            ui.set_party_room("KZDWT6".into());
-            ui.set_party_control(true);
-            ui.set_party_members(members(&[("Guest one", "In sync"), ("Guest two", "Catching up…")]));
+            ui.global::<AppState>().set_tab(3);
+            ui.global::<AppState>().set_party_mode(1);
+            ui.global::<AppState>().set_party_room("KZDWT6".into());
+            ui.global::<AppState>().set_party_control(true);
+            ui.global::<AppState>().set_party_members(members(&[("Guest one", "In sync"), ("Guest two", "Catching up…")]));
         }),
         ("party-guest", |ui| {
-            ui.set_tab(3);
-            ui.set_party_mode(2);
-            ui.set_party_room("KZDWT6".into());
-            ui.set_party_host_name("Giovanni".into());
-            ui.set_party_sync("In sync".into());
-            ui.set_controls_locked(true);
-            ui.set_party_members(members(&[("Guest one", "In sync"), ("You", "In sync")]));
+            ui.global::<AppState>().set_tab(3);
+            ui.global::<AppState>().set_party_mode(2);
+            ui.global::<AppState>().set_party_room("KZDWT6".into());
+            ui.global::<AppState>().set_party_host_name("Giovanni".into());
+            ui.global::<AppState>().set_party_sync("In sync".into());
+            ui.global::<AppState>().set_controls_locked(true);
+            ui.global::<AppState>().set_party_members(members(&[("Guest one", "In sync"), ("You", "In sync")]));
         }),
         ("settings", |ui| {
-            ui.set_settings_open(true);
-            ui.set_update_available(true);
-            ui.set_update_version("1.0.4".into());
-            ui.set_update_host("github.com".into());
+            ui.global::<AppState>().set_settings_open(true);
+            ui.global::<AppState>().set_update_available(true);
+            ui.global::<AppState>().set_update_version("1.0.4".into());
+            ui.global::<AppState>().set_update_host("github.com".into());
         }),
+        ("queue", |ui| ui.global::<AppState>().set_tab(4)),
         ("nothing-playing", |ui| {
-            ui.set_queue(model(vec![]));
-            ui.set_current_index(-1);
-            ui.set_now_title("Nothing playing".into());
-            ui.set_now_detail("".into());
-            ui.set_now_artist("".into());
-            ui.set_now_rest("".into());
-            ui.set_now_artist_id("".into());
-            ui.set_now_cover(Image::default());
-            ui.set_active(false);
-            ui.set_pos_text("0:00".into());
-            ui.set_dur_text("0:00".into());
-            ui.set_progress(0.0);
+            ui.global::<AppState>().set_queue(model(vec![]));
+            ui.global::<AppState>().set_current_index(-1);
+            ui.global::<AppState>().set_now_title("Nothing playing".into());
+            ui.global::<AppState>().set_now_detail("".into());
+            ui.global::<AppState>().set_now_artist("".into());
+            ui.global::<AppState>().set_now_rest("".into());
+            ui.global::<AppState>().set_now_artist_id("".into());
+            ui.global::<AppState>().set_now_cover(Image::default());
+            ui.global::<AppState>().set_active(false);
+            ui.global::<AppState>().set_pos_text("0:00".into());
+            ui.global::<AppState>().set_dur_text("0:00".into());
+            ui.global::<AppState>().set_progress(0.0);
         }),
     ]
 }
@@ -300,15 +301,23 @@ pub fn run(out: PathBuf) -> Result<(), slint::PlatformError> {
     window.set_size(PhysicalSize::new(WIDTH, HEIGHT));
     ui.show()?;
 
-    let mut shots: Vec<(String, String)> = Vec::new();
-    for (palette, scheme_name) in [(1, "dark"), (2, "light"), (3, "slate"), (4, "ember"), (5, "paper"), (6, "black")] {
-        ui.global::<Theme>().set_palette(palette);
-        for (n, (name, setup)) in scenes().iter().enumerate() {
-            base(&ui);
-            setup(&ui);
-            let file = format!("{scheme_name}-{:02}-{name}.png", n + 1);
-            snapshot(&window, &clock, &out.join(&file)).map_err(fail)?;
-            shots.push((scheme_name.to_string(), file));
+    // (section heading, caption, file name)
+    let mut shots: Vec<(String, String, String)> = Vec::new();
+    for (layout, layout_name) in [(0, "tabs"), (1, "sidebar")] {
+        ui.global::<Theme>().set_layout(layout);
+        for (palette, scheme_name) in [(1, "dark"), (2, "light"), (3, "slate"), (4, "ember"), (5, "paper"), (6, "black")] {
+            ui.global::<Theme>().set_palette(palette);
+            for (n, (name, setup)) in scenes().iter().enumerate() {
+                // the queue is a screen of its own only in the sidebar layout
+                if *name == "queue" && layout == 0 {
+                    continue;
+                }
+                base(&ui);
+                setup(&ui);
+                let file = format!("{layout_name}-{scheme_name}-{:02}-{name}.png", n + 1);
+                snapshot(&window, &clock, &out.join(&file)).map_err(fail)?;
+                shots.push((format!("{layout_name} layout, {scheme_name}"), (*name).to_string(), file));
+            }
         }
     }
     write_index(&out, &shots).map_err(|e| fail(format!("couldn't write index.html: {e}")))?;
@@ -334,22 +343,20 @@ fn snapshot(window: &Rc<MinimalSoftwareWindow>, clock: &Cell<Duration>, path: &P
     img.save(path).map_err(|e| format!("couldn't save {}: {e}", path.display()))
 }
 
-fn write_index(out: &Path, shots: &[(String, String)]) -> std::io::Result<()> {
+fn write_index(out: &Path, shots: &[(String, String, String)]) -> std::io::Result<()> {
     let mut html = String::from(
         "<!doctype html><meta charset=utf-8><title>ytmusic-lite screens</title><style>body{font:14px Segoe UI,sans-serif;background:#111;color:#ddd;margin:20px}\
          h2{margin:28px 0 10px}.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:16px}figure{margin:0}img{width:100%;border-radius:8px;border:1px solid #333}\
          figcaption{margin:4px 2px;color:#999}</style>",
     );
-    let mut names: Vec<&str> = shots.iter().map(|(s, _)| s.as_str()).collect();
-    names.dedup();
-    for scheme in names {
-        html.push_str(&format!("<h2>{scheme}</h2><div class=g>"));
-        for (s, file) in shots.iter().filter(|(s, _)| s == scheme) {
-            let label = file.trim_end_matches(".png").trim_start_matches(&format!("{s}-"));
-            html.push_str(&format!("<figure><a href=\"{file}\"><img src=\"{file}\" loading=lazy></a><figcaption>{label}</figcaption></figure>"));
+    let mut sections: Vec<&str> = shots.iter().map(|(s, _, _)| s.as_str()).collect();
+    sections.dedup();
+    for section in sections {
+        html.push_str(&format!("<h2>{section}</h2><div class=g>"));
+        for (_, caption, file) in shots.iter().filter(|(s, _, _)| s == section) {
+            html.push_str(&format!("<figure><a href=\"{file}\"><img src=\"{file}\" loading=lazy></a><figcaption>{caption}</figcaption></figure>"));
         }
         html.push_str("</div>");
     }
     std::fs::write(out.join("index.html"), html)
 }
-

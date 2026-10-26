@@ -1,0 +1,87 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "../theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "../components.slint";
+import { AppState } from "../state.slint";
+
+export component ScreenSignIn inherits VerticalLayout {
+    vertical-stretch: 1;
+    alignment: center;
+    spacing: 12px;
+    Text {
+        text: "Sign in to see your library";
+        color: Theme.text;
+        font-size: 16px;
+        font-weight: 500;
+        horizontal-alignment: center;
+    }
+    Text {
+        text: "A Google sign-in window opens inside the app. Your password goes to Google's own page and is never seen by this app.";
+        color: Theme.text2;
+        font-size: 12px;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+    }
+    HorizontalLayout {
+        alignment: center;
+        TextButton {
+            label: AppState.signing-in ? "Signing in…" : "Sign in with Google";
+            primary: true;
+            clicked => {
+                AppState.sign-in-google();
+            }
+        }
+    }
+    Text {
+        text: AppState.auth-note;
+        color: Theme.danger;
+        font-size: 12px;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+    }
+    Text {
+        text: "Or import a cookies.txt file, or type a browser name (firefox, brave, chrome, edge)";
+        color: Theme.text3;
+        font-size: 12px;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Rectangle {
+            height: 34px;
+            horizontal-stretch: 1;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: signin-field.has-focus ? Theme.accent : Theme.border;
+            background: Theme.surface;
+            if AppState.signin-input == "": Text {
+                text: "C:\\path\\to\\cookies.txt  or  firefox";
+                color: Theme.text3;
+                font-size: 13px;
+                x: 12px;
+                y: (parent.height - self.height) / 2;
+            }
+            signin-field := TextInput {
+                text <=> AppState.signin-input;
+                x: 12px;
+                y: 0px;
+                height: parent.height;
+                vertical-alignment: center;
+                width: parent.width - 24px;
+                font-size: 13px;
+                color: Theme.text;
+                accepted => {
+                    AppState.sign-in(AppState.signin-input);
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            TextButton {
+                label: "Import";
+                clicked => {
+                    AppState.sign-in(AppState.signin-input);
+                }
+            }
+        }
+    }
+}

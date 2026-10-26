@@ -1,0 +1,189 @@
+import { TrackItem, LyricLine, PartyMember } from "theme.slint";
+
+/// All of the interface's state and actions. Screens read and write it from here, so any
+/// screen can be placed in any layout. The Rust side talks to this one global.
+export global AppState {
+    // Changing this by a hair makes the whole window repaint. Windows can throw away what a
+    // window last drew (after sleep or a long idle), and the app only redraws what changed.
+    in-out property <int> repaint-nonce;
+    /// Screens bump this to give the keyboard back to the window's shortcuts (after the search box)
+    in-out property <int> keys-focus-nonce;
+    in-out property <string> query;
+    in-out property <[TrackItem]> results;
+    in-out property <[TrackItem]> queue;
+    in-out property <int> current-index: -1;
+    in-out property <bool> searching;
+    in-out property <string> search-note;
+    in-out property <string> now-title: "Nothing playing";
+    in-out property <string> now-detail;
+    /// `now-detail` split so the artist can be a link (empty while a status message shows)
+    in-out property <string> now-artist;
+    in-out property <string> now-rest;
+    in-out property <string> now-artist-id;
+    // artist pages. Their songs use `playlist-tracks`, so Play all and the row buttons work as in a playlist.
+    in-out property <bool> artist-open;
+    /// An album of the artist is open instead of the artist's own page
+    in-out property <bool> artist-album;
+    in-out property <bool> artist-loading;
+    in-out property <string> artist-note;
+    in-out property <string> artist-name;
+    in-out property <string> artist-sub;
+    in-out property <image> artist-image;
+    in-out property <[TrackItem]> artist-albums;
+    callback set-theme(int);
+    /// The colour chip under the mouse in Settings (-1 for none), so its name is shown
+    in-out property <int> theme-hover: -1;
+    callback move-queue(int, int);
+    callback seek-by(float);
+    /// Set by the "/" shortcut: the search box takes the keyboard as soon as it is on screen
+    in-out property <bool> want-search-focus;
+    callback play-next-result(int);
+    callback play-next-playlist-track(int);
+    callback play-next-queue(int);
+    callback open-track-web(string);
+    /// Queue row being dragged, and the row it would land on (-1 when no drag)
+    in-out property <int> drag-from: -1;
+    in-out property <int> drag-to: -1;
+    callback open-artist(string);
+    callback open-album(int);
+    callback artist-back();
+    callback close-artist();
+    in-out property <image> now-cover;
+    in-out property <string> pos-text: "0:00";
+    in-out property <string> dur-text: "0:00";
+    in-out property <float> duration-secs;
+    in-out property <float> progress;
+    in-out property <bool> active;
+    in-out property <bool> paused;
+    in-out property <bool> loading;
+    in-out property <bool> shuffle;
+    in-out property <int> repeat-mode;
+    in-out property <float> volume: 0.8;
+
+    // 0 = search, 1 = library, 2 = lyrics
+    in-out property <int> tab;
+    in-out property <bool> settings-open;
+    in-out property <bool> signed-in;
+    in-out property <bool> signing-in;
+    in-out property <string> auth-note;
+    in-out property <string> signin-input;
+    in-out property <[TrackItem]> playlists;
+    in-out property <bool> library-loading;
+    in-out property <string> library-note;
+    in-out property <bool> in-playlist;
+    in-out property <string> playlist-title;
+    in-out property <[TrackItem]> playlist-tracks;
+    in-out property <bool> playlist-loading;
+    in-out property <string> playlist-note;
+
+    in-out property <[LyricLine]> lyrics-lines;
+    in-out property <bool> lyrics-synced;
+    in-out property <int> lyrics-current: -1;
+    in-out property <string> lyrics-source;
+    in-out property <bool> lyrics-loading;
+    in-out property <string> lyrics-note;
+
+    in-out property <bool> perf-mode;
+    in-out property <string> cache-text: "Calculating…";
+    in-out property <string> ytdlp-version;
+    in-out property <bool> ytdlp-updating;
+    in-out property <string> ytdlp-note;
+
+    // listening party: 0 = none, 1 = hosting, 2 = following a host
+    in-out property <int> party-mode;
+    in-out property <bool> party-connecting;
+    in-out property <string> party-room;
+    in-out property <string> party-host-name;
+    in-out property <[PartyMember]> party-members;
+    in-out property <string> party-note;
+    in-out property <string> party-sync;
+    /// The host lets everyone play, pause, skip, seek and add songs
+    in-out property <bool> party-control;
+    callback party-control-changed(bool);
+    // updates
+    in-out property <string> app-version;
+    in-out property <bool> update-available;
+    in-out property <string> update-version;
+    in-out property <string> update-notes;
+    /// Where the download link leads, shown next to the button
+    in-out property <string> update-host;
+    in-out property <bool> update-checking;
+    in-out property <string> update-note;
+    in-out property <bool> auto-update-check: true;
+    in-out property <bool> update-dismissed;
+    callback check-update();
+    callback open-update();
+    callback set-auto-update(bool);
+
+    in-out property <string> party-server;
+    /// Parties have a server to use (typed in Settings, or built into the app)
+    in-out property <bool> party-server-ready;
+    /// The app ships with a server address, so Settings can leave the field empty
+    in-out property <bool> party-server-built-in;
+    in-out property <string> display-name;
+    in-out property <string> party-code-input;
+    /// Guests follow the host, so playback controls are switched off for them
+    in-out property <bool> controls-locked;
+
+    callback copy-text(string);
+    callback party-start();
+    callback party-join(string);
+    callback party-leave();
+    callback party-server-edited(string);
+    callback display-name-edited(string);
+    callback prefetch-result(int);
+    callback prefetch-playlist-track(int);
+    callback prefetch-queue(int);
+    callback open-library();
+    callback refresh-library();
+    callback open-playlist(int);
+    callback play-playlist-track(int);
+    callback add-playlist-track(int);
+    callback play-all();
+    callback add-all();
+    callback sign-in(string);
+    callback sign-in-google();
+    callback sign-out();
+    callback search(string);
+    callback play-result(int);
+    callback add-result(int);
+    callback play-queue(int);
+    callback remove-queue(int);
+    callback clear-queue();
+    callback toggle-pause();
+    callback next();
+    callback prev();
+    callback seek(float);
+    callback set-volume(float);
+    callback toggle-shuffle();
+    callback cycle-repeat();
+    /// Which view is showing: 0 search, 1 library, 2 lyrics, -1 settings
+    callback view-changed(int);
+    callback set-perf(bool);
+    callback clear-cache();
+    callback update-ytdlp();
+    callback seek-lyric(float);
+
+
+    callback set-layout(int);
+
+    /// Go to a main screen (0 search, 1 library, 2 lyrics, 3 party, 4 queue) from wherever you are
+    public function go-tab(i: int) {
+        tab = i;
+        settings-open = false;
+        artist-open = false;
+        close-artist();
+        view-changed(i);
+        if (i == 1) {
+            open-library();
+        }
+    }
+
+    public function toggle-settings() {
+        settings-open = !settings-open;
+        view-changed(settings-open ? -1 : tab);
+    }
+    public pure function clock(secs: float) -> string {
+        return "\{Math.floor(secs / 60)}:\{Math.mod(Math.floor(secs), 60) < 10 ? "0" : ""}\{Math.mod(Math.floor(secs), 60)}";
+    }
+}

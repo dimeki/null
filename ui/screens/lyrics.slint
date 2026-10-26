@@ -1,0 +1,59 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "../theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "../components.slint";
+import { AppState } from "../state.slint";
+
+export component ScreenLyrics inherits VerticalLayout {
+    spacing: 8px;
+    vertical-stretch: 1;
+    HorizontalLayout {
+        height: 20px;
+        Text {
+            text: AppState.now-title;
+            color: Theme.text2;
+            font-size: 12px;
+            font-weight: 500;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: AppState.lyrics-source;
+            color: Theme.text3;
+            font-size: 11px;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+        }
+    }
+    Rectangle {
+        vertical-stretch: 1;
+        property <int> now: AppState.lyrics-current;
+        property <int> count: AppState.lyrics-lines.length;
+        changed now => {
+            lyric-list.scroll-center(AppState.lyrics-current * 36px + 18px);
+        }
+        changed count => {
+            lyric-list.scroll-center(0px);
+        }
+        lyric-list := ScrollList {
+            VerticalLayout {
+                alignment: start;
+                for line[i] in AppState.lyrics-lines: LyricRow {
+                    line: line;
+                    current: AppState.lyrics-synced && i == AppState.lyrics-current;
+                    seekable: AppState.lyrics-synced;
+                    activated => {
+                        AppState.seek-lyric(line.time);
+                    }
+                }
+            }
+        }
+        if AppState.lyrics-lines.length == 0: Text {
+            text: AppState.lyrics-loading ? "Looking for lyrics…" : (AppState.lyrics-note != "" ? AppState.lyrics-note : "Play a song to see its lyrics");
+            color: Theme.text3;
+            font-size: 14px;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

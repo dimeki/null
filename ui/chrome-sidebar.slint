@@ -1,0 +1,81 @@
+import { Theme, Glyphs } from "theme.slint";
+import { NavItem } from "components.slint";
+import { AppState } from "state.slint";
+
+/// Navigation down the left edge (the sidebar layout)
+export component SideNav inherits VerticalLayout {
+    padding: 12px;
+    spacing: 2px;
+    HorizontalLayout {
+        height: 44px;
+        padding-left: 8px;
+        spacing: 9px;
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../assets/icon.png");
+                width: 22px;
+                height: 22px;
+            }
+        }
+        Text {
+            text: "ytmusic-lite";
+            font-size: 14px;
+            font-weight: 500;
+            color: Theme.text;
+            vertical-alignment: center;
+        }
+    }
+    NavItem {
+        glyph: Glyphs.search;
+        label: "Search";
+        active: AppState.tab == 0 && !AppState.settings-open;
+        clicked => {
+            AppState.go-tab(0);
+        }
+    }
+    NavItem {
+        glyph: Glyphs.library;
+        label: "Library";
+        active: AppState.tab == 1 && !AppState.settings-open;
+        clicked => {
+            AppState.go-tab(1);
+        }
+    }
+    NavItem {
+        glyph: Glyphs.lyrics;
+        label: "Lyrics";
+        active: AppState.tab == 2 && !AppState.settings-open;
+        clicked => {
+            AppState.go-tab(2);
+        }
+    }
+    NavItem {
+        glyph: Glyphs.party;
+        label: "Party";
+        active: AppState.tab == 3 && !AppState.settings-open;
+        clicked => {
+            AppState.go-tab(3);
+        }
+    }
+    NavItem {
+        glyph: Glyphs.queue;
+        label: "Queue";
+        badge: AppState.queue.length > 0 ? "\{AppState.queue.length}" : "";
+        active: AppState.tab == 4 && !AppState.settings-open;
+        clicked => {
+            AppState.go-tab(4);
+        }
+    }
+    Rectangle {
+        vertical-stretch: 1;
+    }
+    NavItem {
+        glyph: Glyphs.settings;
+        label: "Settings";
+        active: AppState.settings-open;
+        clicked => {
+            AppState.toggle-settings();
+        }
+    }
+}

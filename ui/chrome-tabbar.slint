@@ -1,0 +1,70 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "components.slint";
+import { AppState } from "state.slint";
+
+export component TabBar inherits HorizontalLayout {
+    spacing: 18px;
+    height: 28px;
+    TabButton {
+        label: "Search";
+        active: AppState.tab == 0 && !AppState.settings-open && !AppState.artist-open;
+        clicked => {
+            AppState.tab = 0;
+            AppState.settings-open = false;
+            AppState.artist-open = false;
+            AppState.close-artist();
+            AppState.view-changed(0);
+        }
+    }
+    TabButton {
+        label: "Library";
+        active: AppState.tab == 1 && !AppState.settings-open && !AppState.artist-open;
+        clicked => {
+            AppState.tab = 1;
+            AppState.settings-open = false;
+            AppState.artist-open = false;
+            AppState.close-artist();
+            AppState.view-changed(1);
+            AppState.open-library();
+        }
+    }
+    TabButton {
+        label: "Lyrics";
+        active: AppState.tab == 2 && !AppState.settings-open && !AppState.artist-open;
+        clicked => {
+            AppState.tab = 2;
+            AppState.settings-open = false;
+            AppState.artist-open = false;
+            AppState.close-artist();
+            AppState.view-changed(2);
+        }
+    }
+    TabButton {
+        label: "Party";
+        active: AppState.tab == 3 && !AppState.settings-open && !AppState.artist-open;
+        clicked => {
+            AppState.tab = 3;
+            AppState.settings-open = false;
+            AppState.artist-open = false;
+            AppState.close-artist();
+            AppState.view-changed(3);
+        }
+    }
+    Rectangle {
+        horizontal-stretch: 1;
+    }
+    VerticalLayout {
+        alignment: center;
+        IconButton {
+            glyph: Glyphs.settings;
+            size: 28px;
+            tip: "Settings";
+            tip-below: true;
+            on: AppState.settings-open;
+            clicked => {
+                AppState.settings-open = !AppState.settings-open;
+                AppState.view-changed(AppState.settings-open ? -1 : AppState.tab);
+            }
+        }
+    }
+}

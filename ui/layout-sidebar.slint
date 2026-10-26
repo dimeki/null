@@ -1,0 +1,31 @@
+import { Theme } from "theme.slint";
+import { SideNav } from "chrome-sidebar.slint";
+import { PlayerBar } from "chrome-player.slint";
+import { ScreenHost } from "screen-host.slint";
+
+/// Navigation down the left, screens beside it (the queue is a screen of its own), the player along the bottom
+export component LayoutSidebar inherits VerticalLayout {
+    HorizontalLayout {
+        SideNav {
+            min-width: 176px;
+            max-width: 176px;
+        }
+        Rectangle {
+            width: 1px;
+            background: Theme.border;
+        }
+        VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
+            horizontal-stretch: 1;
+            ScreenHost {
+                vertical-stretch: 1;
+            }
+        }
+    }
+    Rectangle {
+        height: 1px;
+        background: Theme.border;
+    }
+    PlayerBar { }
+}

@@ -71,7 +71,7 @@ fn save_window(ui: &MainWindow) {
     if size.width == 0 || size.height == 0 {
         return;
     }
-    let _ = std::fs::write(window_file(), format!("{} {} {}\n", size.width, size.height, ui.get_tab()));
+    let _ = std::fs::write(window_file(), format!("{} {} {}\n", size.width, size.height, ui.global::<AppState>().get_tab()));
 }
 
 fn main() -> Result<(), slint::PlatformError> {
@@ -86,7 +86,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     if let Some((w, h, tab)) = std::fs::read_to_string(window_file()).ok().and_then(|t| parse_window(&t)) {
         ui.window().set_size(slint::PhysicalSize::new(w, h));
-        ui.set_tab(tab);
+        ui.global::<AppState>().set_tab(tab);
         match tab {
             1 => {
                 let _ = tx.send(Cmd::OpenLibrary);
@@ -99,220 +99,224 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     let t = tx.clone();
-    ui.on_search(move |q| {
+    ui.global::<AppState>().on_search(move |q| {
         let _ = t.send(Cmd::Search(q.to_string()));
     });
     let t = tx.clone();
-    ui.on_play_result(move |i| {
+    ui.global::<AppState>().on_play_result(move |i| {
         let _ = t.send(Cmd::PlayResult(i as usize));
     });
     let t = tx.clone();
-    ui.on_add_result(move |i| {
+    ui.global::<AppState>().on_add_result(move |i| {
         let _ = t.send(Cmd::AddResult(i as usize));
     });
     let t = tx.clone();
-    ui.on_play_queue(move |i| {
+    ui.global::<AppState>().on_play_queue(move |i| {
         let _ = t.send(Cmd::PlayQueue(i as usize));
     });
     let t = tx.clone();
-    ui.on_remove_queue(move |i| {
+    ui.global::<AppState>().on_remove_queue(move |i| {
         let _ = t.send(Cmd::RemoveQueue(i as usize));
     });
     let t = tx.clone();
-    ui.on_clear_queue(move || {
+    ui.global::<AppState>().on_clear_queue(move || {
         let _ = t.send(Cmd::ClearQueue);
     });
     let t = tx.clone();
-    ui.on_toggle_pause(move || {
+    ui.global::<AppState>().on_toggle_pause(move || {
         let _ = t.send(Cmd::TogglePause);
     });
     let t = tx.clone();
-    ui.on_next(move || {
+    ui.global::<AppState>().on_next(move || {
         let _ = t.send(Cmd::Next);
     });
     let t = tx.clone();
-    ui.on_prev(move || {
+    ui.global::<AppState>().on_prev(move || {
         let _ = t.send(Cmd::Prev);
     });
     let t = tx.clone();
-    ui.on_seek(move |f| {
+    ui.global::<AppState>().on_seek(move |f| {
         let _ = t.send(Cmd::SeekFraction(f));
     });
     let t = tx.clone();
-    ui.on_set_theme(move |i| {
+    ui.global::<AppState>().on_set_layout(move |i| {
+        let _ = t.send(Cmd::SetLayout(i));
+    });
+    let t = tx.clone();
+    ui.global::<AppState>().on_set_theme(move |i| {
         let _ = t.send(Cmd::SetTheme(i));
     });
     let t = tx.clone();
-    ui.on_seek_by(move |secs| {
+    ui.global::<AppState>().on_seek_by(move |secs| {
         let _ = t.send(Cmd::SeekBy(secs as f64));
     });
     let t = tx.clone();
-    ui.on_set_volume(move |v| {
+    ui.global::<AppState>().on_set_volume(move |v| {
         let _ = t.send(Cmd::SetVolume(v));
     });
     let t = tx.clone();
-    ui.on_toggle_shuffle(move || {
+    ui.global::<AppState>().on_toggle_shuffle(move || {
         let _ = t.send(Cmd::ToggleShuffle);
     });
     let t = tx.clone();
-    ui.on_cycle_repeat(move || {
+    ui.global::<AppState>().on_cycle_repeat(move || {
         let _ = t.send(Cmd::CycleRepeat);
     });
 
     let (vendor, cache) = (vendor_dir(), cache_dir());
     ytdlp::prune_cache(&cache, CACHE_LIMIT_BYTES);
     let t = tx.clone();
-    ui.on_prefetch_result(move |i| {
+    ui.global::<AppState>().on_prefetch_result(move |i| {
         let _ = t.send(Cmd::PrefetchResult(i as usize));
     });
     let t = tx.clone();
-    ui.on_prefetch_playlist_track(move |i| {
+    ui.global::<AppState>().on_prefetch_playlist_track(move |i| {
         let _ = t.send(Cmd::PrefetchPlaylistTrack(i as usize));
     });
     let t = tx.clone();
-    ui.on_prefetch_queue(move |i| {
+    ui.global::<AppState>().on_prefetch_queue(move |i| {
         let _ = t.send(Cmd::PrefetchQueue(i as usize));
     });
-    ui.on_copy_text(move |text| {
+    ui.global::<AppState>().on_copy_text(move |text| {
         // clipboard failures are harmless: the code is still on screen to read out
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             let _ = clipboard.set_text(text.to_string());
         }
     });
     let t = tx.clone();
-    ui.on_check_update(move || {
+    ui.global::<AppState>().on_check_update(move || {
         let _ = t.send(Cmd::CheckUpdate);
     });
     let t = tx.clone();
-    ui.on_open_update(move || {
+    ui.global::<AppState>().on_open_update(move || {
         let _ = t.send(Cmd::OpenUpdate);
     });
     let t = tx.clone();
-    ui.on_set_auto_update(move |on| {
+    ui.global::<AppState>().on_set_auto_update(move |on| {
         let _ = t.send(Cmd::SetAutoUpdate(on));
     });
     let t = tx.clone();
-    ui.on_move_queue(move |from, to| {
+    ui.global::<AppState>().on_move_queue(move |from, to| {
         let _ = t.send(Cmd::MoveQueue { from: from.max(0) as usize, to: to.max(0) as usize });
     });
     let t = tx.clone();
-    ui.on_play_next_result(move |i| {
+    ui.global::<AppState>().on_play_next_result(move |i| {
         let _ = t.send(Cmd::PlayNextResult(i.max(0) as usize));
     });
     let t = tx.clone();
-    ui.on_play_next_playlist_track(move |i| {
+    ui.global::<AppState>().on_play_next_playlist_track(move |i| {
         let _ = t.send(Cmd::PlayNextPlaylistTrack(i.max(0) as usize));
     });
     let t = tx.clone();
-    ui.on_play_next_queue(move |i| {
+    ui.global::<AppState>().on_play_next_queue(move |i| {
         let _ = t.send(Cmd::PlayNextQueue(i.max(0) as usize));
     });
     let t = tx.clone();
-    ui.on_open_track_web(move |id| {
+    ui.global::<AppState>().on_open_track_web(move |id| {
         let _ = t.send(Cmd::OpenTrackWeb(id.to_string()));
     });
     let t = tx.clone();
-    ui.on_open_artist(move |id| {
+    ui.global::<AppState>().on_open_artist(move |id| {
         let _ = t.send(Cmd::OpenArtist(id.to_string()));
     });
     let t = tx.clone();
-    ui.on_open_album(move |i| {
+    ui.global::<AppState>().on_open_album(move |i| {
         let _ = t.send(Cmd::OpenAlbum(i as usize));
     });
     let t = tx.clone();
-    ui.on_artist_back(move || {
+    ui.global::<AppState>().on_artist_back(move || {
         let _ = t.send(Cmd::ArtistBack);
     });
     let t = tx.clone();
-    ui.on_close_artist(move || {
+    ui.global::<AppState>().on_close_artist(move || {
         let _ = t.send(Cmd::CloseArtist);
     });
     let t = tx.clone();
-    ui.on_party_start(move || {
+    ui.global::<AppState>().on_party_start(move || {
         let _ = t.send(Cmd::PartyHost);
     });
     let t = tx.clone();
-    ui.on_party_join(move |code| {
+    ui.global::<AppState>().on_party_join(move |code| {
         let _ = t.send(Cmd::PartyJoin(code.to_string()));
     });
     let t = tx.clone();
-    ui.on_party_control_changed(move |on| {
+    ui.global::<AppState>().on_party_control_changed(move |on| {
         let _ = t.send(Cmd::PartyControl(on));
     });
     let t = tx.clone();
-    ui.on_party_leave(move || {
+    ui.global::<AppState>().on_party_leave(move || {
         let _ = t.send(Cmd::PartyLeave);
     });
     let t = tx.clone();
-    ui.on_party_server_edited(move |address| {
+    ui.global::<AppState>().on_party_server_edited(move |address| {
         let _ = t.send(Cmd::SetPartyServer(address.to_string()));
     });
     let t = tx.clone();
-    ui.on_display_name_edited(move |name| {
+    ui.global::<AppState>().on_display_name_edited(move |name| {
         let _ = t.send(Cmd::SetDisplayName(name.to_string()));
     });
     let t = tx.clone();
-    ui.on_view_changed(move |view| {
+    ui.global::<AppState>().on_view_changed(move |view| {
         let _ = t.send(Cmd::ViewChanged(view));
     });
     let t = tx.clone();
-    ui.on_set_perf(move |on| {
+    ui.global::<AppState>().on_set_perf(move |on| {
         let _ = t.send(Cmd::SetPerf(on));
     });
     let t = tx.clone();
-    ui.on_clear_cache(move || {
+    ui.global::<AppState>().on_clear_cache(move || {
         let _ = t.send(Cmd::ClearCache);
     });
     let t = tx.clone();
-    ui.on_update_ytdlp(move || {
+    ui.global::<AppState>().on_update_ytdlp(move || {
         let _ = t.send(Cmd::UpdateYtdlp);
     });
     let t = tx.clone();
-    ui.on_refresh_library(move || {
+    ui.global::<AppState>().on_refresh_library(move || {
         let _ = t.send(Cmd::RefreshLibrary);
     });
     let t = tx.clone();
-    ui.on_seek_lyric(move |secs| {
+    ui.global::<AppState>().on_seek_lyric(move |secs| {
         let _ = t.send(Cmd::SeekSecs(secs as f64));
     });
     let t = tx.clone();
-    ui.on_open_library(move || {
+    ui.global::<AppState>().on_open_library(move || {
         let _ = t.send(Cmd::OpenLibrary);
     });
     let t = tx.clone();
-    ui.on_open_playlist(move |i| {
+    ui.global::<AppState>().on_open_playlist(move |i| {
         let _ = t.send(Cmd::OpenPlaylist(i as usize));
     });
     let t = tx.clone();
-    ui.on_play_playlist_track(move |i| {
+    ui.global::<AppState>().on_play_playlist_track(move |i| {
         let _ = t.send(Cmd::PlayPlaylistTrack(i as usize));
     });
     let t = tx.clone();
-    ui.on_add_playlist_track(move |i| {
+    ui.global::<AppState>().on_add_playlist_track(move |i| {
         let _ = t.send(Cmd::AddPlaylistTrack(i as usize));
     });
     let t = tx.clone();
-    ui.on_play_all(move || {
+    ui.global::<AppState>().on_play_all(move || {
         let _ = t.send(Cmd::PlayAll);
     });
     let t = tx.clone();
-    ui.on_add_all(move || {
+    ui.global::<AppState>().on_add_all(move || {
         let _ = t.send(Cmd::AddAll);
     });
     let t = tx.clone();
-    ui.on_sign_in(move |input| {
+    ui.global::<AppState>().on_sign_in(move |input| {
         let _ = t.send(Cmd::SignIn(input.to_string()));
     });
     let (t, weak, dest) = (tx.clone(), ui.as_weak(), cache_dir().with_file_name("cookies.txt"));
-    ui.on_sign_in_google(move || {
+    ui.global::<AppState>().on_sign_in_google(move || {
         if let Some(ui) = weak.upgrade() {
-            ui.set_signing_in(true);
-            ui.set_auth_note("".into());
+            ui.global::<AppState>().set_signing_in(true);
+            ui.global::<AppState>().set_auth_note("".into());
         }
         login::open(t.clone(), dest.clone());
     });
     let t = tx.clone();
-    ui.on_sign_out(move || {
+    ui.global::<AppState>().on_sign_out(move || {
         let _ = t.send(Cmd::SignOut);
     });
 
@@ -343,8 +347,8 @@ fn main() -> Result<(), slint::PlatformError> {
         let Some(ui) = weak_ui.upgrade() else { return };
         ticks = ticks.wrapping_add(1);
         // performance saving trades a slower repair for less work
-        if ui.window().is_visible() && (!ui.get_perf_mode() || ticks % 3 == 0) {
-            ui.set_repaint_nonce(ui.get_repaint_nonce().wrapping_add(1));
+        if ui.window().is_visible() && (!ui.global::<AppState>().get_perf_mode() || ticks % 3 == 0) {
+            ui.global::<AppState>().set_repaint_nonce(ui.global::<AppState>().get_repaint_nonce().wrapping_add(1));
         }
     });
 

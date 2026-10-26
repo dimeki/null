@@ -1,0 +1,88 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "../theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "../components.slint";
+import { AppState } from "../state.slint";
+
+export component ScreenPlaylist inherits VerticalLayout {
+    spacing: 10px;
+    vertical-stretch: 1;
+    HorizontalLayout {
+        height: 30px;
+        spacing: 10px;
+        TextButton {
+            label: "Back";
+            clicked => {
+                AppState.in-playlist = false;
+            }
+        }
+        Text {
+            text: AppState.playlist-title;
+            color: Theme.text;
+            font-size: 14px;
+            font-weight: 500;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        TextButton {
+            label: "Play all";
+            primary: true;
+            clicked => {
+                AppState.play-all();
+            }
+        }
+        TextButton {
+            label: "Add all";
+            clicked => {
+                AppState.add-all();
+            }
+        }
+    }
+    Rectangle {
+        vertical-stretch: 1;
+        ScrollList {
+            VerticalLayout {
+                spacing: 2px;
+                alignment: start;
+                for item[i] in AppState.playlist-tracks: TrackRow {
+                    menu: true;
+                    menu-add: true;
+                    menu-play-next => {
+                        AppState.play-next-playlist-track(i);
+                    }
+                    menu-add-clicked => {
+                        AppState.add-playlist-track(i);
+                    }
+                    menu-copy-link(url) => {
+                        AppState.copy-text(url);
+                    }
+                    menu-open-web(id) => {
+                        AppState.open-track-web(id);
+                    }
+                    artist-clicked(id) => {
+                        AppState.open-artist(id);
+                    }
+                    item: item;
+                    action-glyph: Glyphs.plus;
+                    action-tip: "Add to queue";
+                    hover-intent => {
+                        AppState.prefetch-playlist-track(i);
+                    }
+                    activated => {
+                        AppState.play-playlist-track(i);
+                    }
+                    action => {
+                        AppState.add-playlist-track(i);
+                    }
+                }
+            }
+        }
+        if AppState.playlist-tracks.length == 0: Text {
+            text: AppState.playlist-loading ? "Loading…" : (AppState.playlist-note != "" ? AppState.playlist-note : "This playlist is empty");
+            color: Theme.text3;
+            font-size: 14px;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

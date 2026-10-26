@@ -5,7 +5,7 @@ use crate::mpv::{Mpv, PlayerEvent};
 use crate::party::{self, Act, ActKind, Correction, HostState, Out as PartyOut, TrackInfo};
 use crate::update;
 use crate::ytdlp::{Track, YtDlp};
-use crate::{LyricLine, MainWindow, PartyMember, Theme, TrackItem};
+use crate::{AppState, LyricLine, MainWindow, PartyMember, Theme, TrackItem};
 use slint::{ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, VecModel, Weak};
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
@@ -123,6 +123,8 @@ pub enum Cmd {
     SetAutoUpdate(bool),
     /// The user picked a colour theme (0 follows Windows)
     SetTheme(i32),
+    /// The user picked a layout (0 tabs, 1 sidebar)
+    SetLayout(i32),
 }
 
 struct ArtistView {
@@ -313,6 +315,8 @@ struct Engine {
     auto_update: bool,
     /// Colour theme: 0 follows Windows, then the palettes in ui/theme.slint
     theme: i32,
+    /// Layout: 0 tabs along the top, 1 a sidebar
+    layout: i32,
     /// When the next automatic check is due (none while automatic checks are off)
     next_update_check: Option<Instant>,
 }
@@ -321,7 +325,7 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
     let mpv = match Mpv::new(&vendor.join("libmpv-2.dll")) {
         Ok(m) => m,
         Err(e) => {
-            let _ = ui.upgrade_in_event_loop(move |ui| ui.set_search_note(e.into()));
+            let _ = ui.upgrade_in_event_loop(move |ui| ui.global::<AppState>().set_search_note(e.into()));
             return;
         }
     };
@@ -405,6 +409,7 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
         update_note: String::new(),
         auto_update: true,
         theme: 0,
+        layout: 0,
         next_update_check: None,
     };
     eng.load_stored_auth();
@@ -536,13 +541,13 @@ impl Engine {
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             let img = cover(&rgba);
             if current_id.as_deref() == Some(id.as_str()) {
-                ui.set_now_cover(img.clone());
+                ui.global::<AppState>().set_now_cover(img.clone());
             }
             if header_id.as_deref() == Some(id.as_str()) {
-                ui.set_artist_image(img.clone());
+                ui.global::<AppState>().set_artist_image(img.clone());
             }
             // update rows in place so the lists don't rebuild or jump while scrolling
-            for model in [ui.get_results(), ui.get_queue(), ui.get_playlist_tracks(), ui.get_playlists(), ui.get_artist_albums()] {
+            for model in [ui.global::<AppState>().get_results(), ui.global::<AppState>().get_queue(), ui.global::<AppState>().get_playlist_tracks(), ui.global::<AppState>().get_playlists(), ui.global::<AppState>().get_artist_albums()] {
                 for i in 0..model.row_count() {
                     if let Some(mut row) = model.row_data(i) {
                         if row.id == id.as_str() {
@@ -609,6 +614,10 @@ impl Engine {
                 if let Some(release) = &self.update {
                     let _ = webbrowser::open(&release.url);
                 }
+            }
+            Cmd::SetLayout(layout) => {
+                self.layout = layout.clamp(0, 1);
+                self.dirty.set(true);
             }
             Cmd::SetTheme(theme) => {
                 self.theme = theme.clamp(0, 6);
@@ -712,8 +721,8 @@ impl Engine {
                     Err(e) => format!("Update failed: {}", e.lines().last().unwrap_or("unknown error")),
                 };
                 let _ = self.ui.upgrade_in_event_loop(move |ui| {
-                    ui.set_ytdlp_updating(false);
-                    ui.set_ytdlp_note(note.into());
+                    ui.global::<AppState>().set_ytdlp_updating(false);
+                    ui.global::<AppState>().set_ytdlp_note(note.into());
                 });
                 self.fetch_ytdlp_version();
             }
@@ -807,7 +816,7 @@ impl Engine {
                     self.sync();
                     self.push_progress();
                     // and redraw all of it: what the window last drew may be gone
-                    let _ = self.ui.upgrade_in_event_loop(|ui| ui.set_repaint_nonce(ui.get_repaint_nonce().wrapping_add(1)));
+                    let _ = self.ui.upgrade_in_event_loop(|ui| ui.global::<AppState>().set_repaint_nonce(ui.global::<AppState>().get_repaint_nonce().wrapping_add(1)));
                 } else {
                     self.trim_at = Some(Instant::now() + Duration::from_millis(500));
                 }
@@ -888,20 +897,20 @@ impl Engine {
         self.client = Client::new(auth);
         self.ytdlp.set_cookies(self.signed_in.then(|| self.cookie_path.clone()));
         let signed_in = self.signed_in;
-        let _ = self.ui.upgrade_in_event_loop(move |ui| ui.set_signed_in(signed_in));
+        let _ = self.ui.upgrade_in_event_loop(move |ui| ui.global::<AppState>().set_signed_in(signed_in));
     }
 
     fn sign_in(&mut self, input: String) {
         let input = input.trim().trim_matches('"').to_string();
         if input.is_empty() {
             let _ = self.ui.upgrade_in_event_loop(|ui| {
-                ui.set_auth_note("Enter the path to a cookies.txt file, or a browser name.".into());
+                ui.global::<AppState>().set_auth_note("Enter the path to a cookies.txt file, or a browser name.".into());
             });
             return;
         }
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_signing_in(true);
-            ui.set_auth_note("".into());
+            ui.global::<AppState>().set_signing_in(true);
+            ui.global::<AppState>().set_auth_note("".into());
         });
         let (ytdlp, dest, tx) = (self.ytdlp.clone(), self.cookie_path.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -921,9 +930,9 @@ impl Engine {
                 self.load_stored_auth();
                 self.playlists.clear();
                 let _ = self.ui.upgrade_in_event_loop(|ui| {
-                    ui.set_signing_in(false);
-                    ui.set_signin_input("".into());
-                    ui.set_auth_note("".into());
+                    ui.global::<AppState>().set_signing_in(false);
+                    ui.global::<AppState>().set_signin_input("".into());
+                    ui.global::<AppState>().set_auth_note("".into());
                 });
                 if self.signed_in {
                     self.load_library();
@@ -931,8 +940,8 @@ impl Engine {
             }
             Err(e) => {
                 let _ = self.ui.upgrade_in_event_loop(move |ui| {
-                    ui.set_signing_in(false);
-                    ui.set_auth_note(e.into());
+                    ui.global::<AppState>().set_signing_in(false);
+                    ui.global::<AppState>().set_auth_note(e.into());
                 });
             }
         }
@@ -946,18 +955,18 @@ impl Engine {
         self.playlist_id.clear();
         self.library_loading = false;
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_in_playlist(false);
-            ui.set_playlists(ModelRc::new(VecModel::<TrackItem>::default()));
-            ui.set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
-            ui.set_library_note("".into());
+            ui.global::<AppState>().set_in_playlist(false);
+            ui.global::<AppState>().set_playlists(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_library_note("".into());
         });
     }
 
     fn load_library(&mut self) {
         self.library_loading = true;
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_library_loading(true);
-            ui.set_library_note("".into());
+            ui.global::<AppState>().set_library_loading(true);
+            ui.global::<AppState>().set_library_note("".into());
         });
         let (client, tx) = (self.client.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -980,9 +989,9 @@ impl Engine {
         let playlists = self.playlists.clone();
         let thumbs = self.thumbs.clone();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_playlists(playlist_items(&playlists, &thumbs));
-            ui.set_library_loading(false);
-            ui.set_library_note(note.into());
+            ui.global::<AppState>().set_playlists(playlist_items(&playlists, &thumbs));
+            ui.global::<AppState>().set_library_loading(false);
+            ui.global::<AppState>().set_library_note(note.into());
         });
     }
 
@@ -992,10 +1001,10 @@ impl Engine {
         self.playlist_tracks.clear();
         let title = info.title.clone();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_playlist_title(title.into());
-            ui.set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
-            ui.set_playlist_loading(true);
-            ui.set_playlist_note("".into());
+            ui.global::<AppState>().set_playlist_title(title.into());
+            ui.global::<AppState>().set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_playlist_loading(true);
+            ui.global::<AppState>().set_playlist_note("".into());
         });
         let (client, tx) = (self.client.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -1019,9 +1028,9 @@ impl Engine {
         let tracks = self.playlist_tracks.clone();
         let thumbs = self.thumbs.clone();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_playlist_tracks(items(&tracks, &thumbs));
-            ui.set_playlist_loading(false);
-            ui.set_playlist_note(note.into());
+            ui.global::<AppState>().set_playlist_tracks(items(&tracks, &thumbs));
+            ui.global::<AppState>().set_playlist_loading(false);
+            ui.global::<AppState>().set_playlist_note(note.into());
         });
     }
 
@@ -1039,16 +1048,16 @@ impl Engine {
         self.album_wanted.clear();
         self.artist_wanted = id.clone();
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_in_playlist(false);
-            ui.set_artist_open(true);
-            ui.set_artist_album(false);
-            ui.set_artist_loading(true);
-            ui.set_artist_note("".into());
-            ui.set_artist_name("".into());
-            ui.set_artist_sub("".into());
-            ui.set_artist_image(Image::default());
-            ui.set_artist_albums(ModelRc::new(VecModel::<TrackItem>::default()));
-            ui.set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_in_playlist(false);
+            ui.global::<AppState>().set_artist_open(true);
+            ui.global::<AppState>().set_artist_album(false);
+            ui.global::<AppState>().set_artist_loading(true);
+            ui.global::<AppState>().set_artist_note("".into());
+            ui.global::<AppState>().set_artist_name("".into());
+            ui.global::<AppState>().set_artist_sub("".into());
+            ui.global::<AppState>().set_artist_image(Image::default());
+            ui.global::<AppState>().set_artist_albums(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
         });
         let (client, tx) = (self.client.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -1066,12 +1075,12 @@ impl Engine {
                 self.playlist_tracks = page.songs.clone();
                 self.artist = Some(ArtistView { id, page });
                 self.push_artist();
-                let _ = self.ui.upgrade_in_event_loop(|ui| ui.set_artist_loading(false));
+                let _ = self.ui.upgrade_in_event_loop(|ui| ui.global::<AppState>().set_artist_loading(false));
             }
             Err(note) => {
                 let _ = self.ui.upgrade_in_event_loop(move |ui| {
-                    ui.set_artist_loading(false);
-                    ui.set_artist_note(note.into());
+                    ui.global::<AppState>().set_artist_loading(false);
+                    ui.global::<AppState>().set_artist_note(note.into());
                 });
             }
         }
@@ -1084,8 +1093,8 @@ impl Engine {
         self.playlist_tracks.clear();
         self.push_artist();
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_artist_loading(true);
-            ui.set_artist_note("".into());
+            ui.global::<AppState>().set_artist_loading(true);
+            ui.global::<AppState>().set_artist_note("".into());
         });
         let (client, tx) = (self.client.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -1107,8 +1116,8 @@ impl Engine {
         };
         self.push_artist();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_artist_loading(false);
-            ui.set_artist_note(note.into());
+            ui.global::<AppState>().set_artist_loading(false);
+            ui.global::<AppState>().set_artist_note(note.into());
         });
     }
 
@@ -1119,8 +1128,8 @@ impl Engine {
             self.playlist_tracks = self.artist.as_ref().map(|v| v.page.songs.clone()).unwrap_or_default();
             self.push_artist();
             let _ = self.ui.upgrade_in_event_loop(|ui| {
-                ui.set_artist_loading(false);
-                ui.set_artist_note("".into());
+                ui.global::<AppState>().set_artist_loading(false);
+                ui.global::<AppState>().set_artist_note("".into());
             });
         } else {
             self.close_artist();
@@ -1134,11 +1143,11 @@ impl Engine {
         self.album_wanted.clear();
         self.playlist_tracks.clear();
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_artist_open(false);
-            ui.set_artist_album(false);
-            ui.set_artist_loading(false);
-            ui.set_artist_albums(ModelRc::new(VecModel::<TrackItem>::default()));
-            ui.set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_artist_open(false);
+            ui.global::<AppState>().set_artist_album(false);
+            ui.global::<AppState>().set_artist_loading(false);
+            ui.global::<AppState>().set_artist_albums(ModelRc::new(VecModel::<TrackItem>::default()));
+            ui.global::<AppState>().set_playlist_tracks(ModelRc::new(VecModel::<TrackItem>::default()));
         });
     }
 
@@ -1159,12 +1168,12 @@ impl Engine {
             .collect();
         let (tracks, thumbs) = (self.playlist_tracks.clone(), self.thumbs.clone());
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_artist_album(is_album);
-            ui.set_artist_name(title.into());
-            ui.set_artist_sub(sub.into());
-            ui.set_artist_image(image.map(|b| cover(&b)).unwrap_or_default());
-            ui.set_artist_albums(playlist_items(&albums, &thumbs));
-            ui.set_playlist_tracks(items(&tracks, &thumbs));
+            ui.global::<AppState>().set_artist_album(is_album);
+            ui.global::<AppState>().set_artist_name(title.into());
+            ui.global::<AppState>().set_artist_sub(sub.into());
+            ui.global::<AppState>().set_artist_image(image.map(|b| cover(&b)).unwrap_or_default());
+            ui.global::<AppState>().set_artist_albums(playlist_items(&albums, &thumbs));
+            ui.global::<AppState>().set_playlist_tracks(items(&tracks, &thumbs));
         });
     }
 
@@ -1191,14 +1200,14 @@ impl Engine {
     fn push_update(&self) {
         let (release, checking, note, auto) = (self.update.clone(), self.update_checking, self.update_note.clone(), self.auto_update);
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_app_version(update::CURRENT_VERSION.into());
-            ui.set_update_available(release.is_some());
-            ui.set_update_version(release.as_ref().map(|r| r.version.clone()).unwrap_or_default().into());
-            ui.set_update_notes(release.as_ref().map(|r| r.notes.clone()).unwrap_or_default().into());
-            ui.set_update_host(release.as_ref().map(|r| r.host()).unwrap_or_default().into());
-            ui.set_update_checking(checking);
-            ui.set_update_note(note.into());
-            ui.set_auto_update_check(auto);
+            ui.global::<AppState>().set_app_version(update::CURRENT_VERSION.into());
+            ui.global::<AppState>().set_update_available(release.is_some());
+            ui.global::<AppState>().set_update_version(release.as_ref().map(|r| r.version.clone()).unwrap_or_default().into());
+            ui.global::<AppState>().set_update_notes(release.as_ref().map(|r| r.notes.clone()).unwrap_or_default().into());
+            ui.global::<AppState>().set_update_host(release.as_ref().map(|r| r.host()).unwrap_or_default().into());
+            ui.global::<AppState>().set_update_checking(checking);
+            ui.global::<AppState>().set_update_note(note.into());
+            ui.global::<AppState>().set_auto_update_check(auto);
         });
     }
 
@@ -1603,19 +1612,19 @@ impl Engine {
         let control = self.party.as_ref().is_some_and(|p| p.control);
         let locked = mode == 2 && !control;
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_party_control(control);
-            ui.set_party_mode(mode);
-            ui.set_party_connecting(connecting);
-            ui.set_party_room(room.into());
-            ui.set_party_host_name(host.into());
+            ui.global::<AppState>().set_party_control(control);
+            ui.global::<AppState>().set_party_mode(mode);
+            ui.global::<AppState>().set_party_connecting(connecting);
+            ui.global::<AppState>().set_party_room(room.into());
+            ui.global::<AppState>().set_party_host_name(host.into());
             let rows: Vec<PartyMember> = members
                 .into_iter()
                 .map(|(name, initial, tag)| PartyMember { name: name.into(), initial: initial.into(), tag: tag.into() })
                 .collect();
-            ui.set_party_members(ModelRc::new(VecModel::from(rows)));
-            ui.set_party_note(note.into());
-            ui.set_party_sync(sync_text.into());
-            ui.set_controls_locked(locked);
+            ui.global::<AppState>().set_party_members(ModelRc::new(VecModel::from(rows)));
+            ui.global::<AppState>().set_party_note(note.into());
+            ui.global::<AppState>().set_party_sync(sync_text.into());
+            ui.global::<AppState>().set_controls_locked(locked);
         });
     }
 
@@ -1623,8 +1632,8 @@ impl Engine {
     fn push_party_settings(&self) {
         let (server, name) = (self.party_server.clone(), self.display_name.clone());
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_party_server(server.into());
-            ui.set_display_name(name.into());
+            ui.global::<AppState>().set_party_server(server.into());
+            ui.global::<AppState>().set_display_name(name.into());
         });
         self.push_party_server_state();
     }
@@ -1634,8 +1643,8 @@ impl Engine {
         let usable = !self.effective_party_server().is_empty();
         let built_in = crate::config::DEFAULT_PARTY_SERVER.to_string();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_party_server_ready(usable);
-            ui.set_party_server_built_in(!built_in.is_empty());
+            ui.global::<AppState>().set_party_server_ready(usable);
+            ui.global::<AppState>().set_party_server_built_in(!built_in.is_empty());
         });
     }
 
@@ -1649,12 +1658,12 @@ impl Engine {
         self.lyrics = None;
         self.lyrics_cur = -1;
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_lyrics_lines(ModelRc::new(VecModel::<LyricLine>::default()));
-            ui.set_lyrics_synced(false);
-            ui.set_lyrics_current(-1);
-            ui.set_lyrics_source("".into());
-            ui.set_lyrics_note("".into());
-            ui.set_lyrics_loading(true);
+            ui.global::<AppState>().set_lyrics_lines(ModelRc::new(VecModel::<LyricLine>::default()));
+            ui.global::<AppState>().set_lyrics_synced(false);
+            ui.global::<AppState>().set_lyrics_current(-1);
+            ui.global::<AppState>().set_lyrics_source("".into());
+            ui.global::<AppState>().set_lyrics_note("".into());
+            ui.global::<AppState>().set_lyrics_loading(true);
         });
         let (client, tx) = (self.client.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -1682,12 +1691,12 @@ impl Engine {
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             let rows: Vec<LyricLine> =
                 lines.iter().map(|(t, s)| LyricLine { text: s.as_str().into(), time: *t as f32 }).collect();
-            ui.set_lyrics_lines(ModelRc::new(VecModel::from(rows)));
-            ui.set_lyrics_synced(synced);
-            ui.set_lyrics_source(source.into());
-            ui.set_lyrics_note(note.into());
-            ui.set_lyrics_loading(false);
-            ui.set_lyrics_current(-1);
+            ui.global::<AppState>().set_lyrics_lines(ModelRc::new(VecModel::from(rows)));
+            ui.global::<AppState>().set_lyrics_synced(synced);
+            ui.global::<AppState>().set_lyrics_source(source.into());
+            ui.global::<AppState>().set_lyrics_note(note.into());
+            ui.global::<AppState>().set_lyrics_loading(false);
+            ui.global::<AppState>().set_lyrics_current(-1);
         });
         self.update_lyric_cursor();
     }
@@ -1703,7 +1712,7 @@ impl Engine {
         let idx = lyrics.lines.partition_point(|(t, _)| *t <= pos + 0.15) as i32 - 1;
         if idx != self.lyrics_cur {
             self.lyrics_cur = idx;
-            let _ = self.ui.upgrade_in_event_loop(move |ui| ui.set_lyrics_current(idx));
+            let _ = self.ui.upgrade_in_event_loop(move |ui| ui.global::<AppState>().set_lyrics_current(idx));
         }
     }
 
@@ -1714,7 +1723,7 @@ impl Engine {
         }
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             ui.global::<Theme>().set_perf(on);
-            ui.set_perf_mode(on);
+            ui.global::<AppState>().set_perf_mode(on);
         });
         self.push_lists();
         self.sync();
@@ -1726,9 +1735,9 @@ impl Engine {
         let (results, playlists, tracks) = (self.results.clone(), self.playlists.clone(), self.playlist_tracks.clone());
         let thumbs = self.thumbs.clone();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_results(items(&results, &thumbs));
-            ui.set_playlists(playlist_items(&playlists, &thumbs));
-            ui.set_playlist_tracks(items(&tracks, &thumbs));
+            ui.global::<AppState>().set_results(items(&results, &thumbs));
+            ui.global::<AppState>().set_playlists(playlist_items(&playlists, &thumbs));
+            ui.global::<AppState>().set_playlist_tracks(items(&tracks, &thumbs));
         });
         self.push_artist();
     }
@@ -1744,10 +1753,10 @@ impl Engine {
         };
         let (version, perf, updating) = (self.ytdlp_version.clone(), self.perf, self.ytdlp_updating);
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_cache_text(cache_text.into());
-            ui.set_ytdlp_version(version.into());
-            ui.set_perf_mode(perf);
-            ui.set_ytdlp_updating(updating);
+            ui.global::<AppState>().set_cache_text(cache_text.into());
+            ui.global::<AppState>().set_ytdlp_version(version.into());
+            ui.global::<AppState>().set_perf_mode(perf);
+            ui.global::<AppState>().set_ytdlp_updating(updating);
         });
     }
 
@@ -1776,8 +1785,8 @@ impl Engine {
         }
         self.ytdlp_updating = true;
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_ytdlp_updating(true);
-            ui.set_ytdlp_note("Checking for updates…".into());
+            ui.global::<AppState>().set_ytdlp_updating(true);
+            ui.global::<AppState>().set_ytdlp_note("Checking for updates…".into());
         });
         let (ytdlp, tx) = (self.ytdlp.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -1791,8 +1800,8 @@ impl Engine {
             return;
         }
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_searching(true);
-            ui.set_search_note("".into());
+            ui.global::<AppState>().set_searching(true);
+            ui.global::<AppState>().set_search_note("".into());
         });
         let (client, ytdlp, tx) = (self.client.clone(), self.ytdlp.clone(), self.tx.clone());
         std::thread::spawn(move || {
@@ -1814,9 +1823,9 @@ impl Engine {
         self.results = tracks.clone();
         let thumbs = self.thumbs.clone();
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_results(items(&tracks, &thumbs));
-            ui.set_searching(false);
-            ui.set_search_note(note.into());
+            ui.global::<AppState>().set_results(items(&tracks, &thumbs));
+            ui.global::<AppState>().set_searching(false);
+            ui.global::<AppState>().set_search_note(note.into());
         });
     }
 
@@ -2040,10 +2049,10 @@ impl Engine {
         self.lyrics = None;
         self.lyrics_cur = -1;
         let _ = self.ui.upgrade_in_event_loop(|ui| {
-            ui.set_lyrics_lines(ModelRc::new(VecModel::<LyricLine>::default()));
-            ui.set_lyrics_note("".into());
-            ui.set_lyrics_source("".into());
-            ui.set_lyrics_current(-1);
+            ui.global::<AppState>().set_lyrics_lines(ModelRc::new(VecModel::<LyricLine>::default()));
+            ui.global::<AppState>().set_lyrics_note("".into());
+            ui.global::<AppState>().set_lyrics_source("".into());
+            ui.global::<AppState>().set_lyrics_current(-1);
         });
     }
 
@@ -2064,7 +2073,12 @@ impl Engine {
         self.auto_update = saved.auto_update_check;
         self.theme = saved.theme;
         let theme = saved.theme;
-        let _ = self.ui.upgrade_in_event_loop(move |ui| ui.global::<Theme>().set_palette(theme));
+        self.layout = saved.layout;
+        let layout = saved.layout;
+        let _ = self.ui.upgrade_in_event_loop(move |ui| {
+            ui.global::<Theme>().set_palette(theme);
+            ui.global::<Theme>().set_layout(layout);
+        });
         if !saved.display_name.is_empty() {
             self.display_name = saved.display_name;
         }
@@ -2084,7 +2098,7 @@ impl Engine {
         self.dirty.set(false);
         self.refresh_thumbs();
         let volume = self.volume;
-        let _ = self.ui.upgrade_in_event_loop(move |ui| ui.set_volume(volume));
+        let _ = self.ui.upgrade_in_event_loop(move |ui| ui.global::<AppState>().set_volume(volume));
         self.sync();
         self.push_progress();
     }
@@ -2111,6 +2125,7 @@ impl Engine {
             display_name: self.display_name.clone(),
             auto_update_check: self.auto_update,
             theme: self.theme,
+            layout: self.layout,
         };
         let _ = crate::state::save(&self.state_path, &saved);
         self.last_save = Instant::now();
@@ -2178,19 +2193,19 @@ impl Engine {
             Repeat::One => 2,
         };
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_queue(items(&queue, &thumbs));
-            ui.set_now_cover(now_cover.map(|b| cover(&b)).unwrap_or_default());
-            ui.set_current_index(cur);
-            ui.set_now_title(title.into());
-            ui.set_now_detail(detail.into());
-            ui.set_now_artist(artist.into());
-            ui.set_now_rest(rest.into());
-            ui.set_now_artist_id(artist_id.into());
-            ui.set_active(active);
-            ui.set_paused(paused);
-            ui.set_loading(loading);
-            ui.set_shuffle(shuffle);
-            ui.set_repeat_mode(repeat);
+            ui.global::<AppState>().set_queue(items(&queue, &thumbs));
+            ui.global::<AppState>().set_now_cover(now_cover.map(|b| cover(&b)).unwrap_or_default());
+            ui.global::<AppState>().set_current_index(cur);
+            ui.global::<AppState>().set_now_title(title.into());
+            ui.global::<AppState>().set_now_detail(detail.into());
+            ui.global::<AppState>().set_now_artist(artist.into());
+            ui.global::<AppState>().set_now_rest(rest.into());
+            ui.global::<AppState>().set_now_artist_id(artist_id.into());
+            ui.global::<AppState>().set_active(active);
+            ui.global::<AppState>().set_paused(paused);
+            ui.global::<AppState>().set_loading(loading);
+            ui.global::<AppState>().set_shuffle(shuffle);
+            ui.global::<AppState>().set_repeat_mode(repeat);
             crate::media::update(&np);
         });
     }
@@ -2208,10 +2223,10 @@ impl Engine {
         };
         let fraction = if dur > 0.0 { (pos / dur) as f32 } else { 0.0 };
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            ui.set_pos_text(clock(pos).into());
-            ui.set_dur_text(clock(dur).into());
-            ui.set_duration_secs(dur as f32);
-            ui.set_progress(fraction);
+            ui.global::<AppState>().set_pos_text(clock(pos).into());
+            ui.global::<AppState>().set_dur_text(clock(dur).into());
+            ui.global::<AppState>().set_duration_secs(dur as f32);
+            ui.global::<AppState>().set_progress(fraction);
         });
     }
 }

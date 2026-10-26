@@ -1,0 +1,189 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "components.slint";
+import { AppState } from "state.slint";
+
+export component PlayerBar inherits Rectangle {
+    height: 76px;
+    background: Theme.surface;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 16px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                min-width: 48px;
+                max-width: 48px;
+                min-height: 48px;
+                max-height: 48px;
+                border-radius: 6px;
+                background: Theme.accent-bg;
+                clip: true;
+                if AppState.now-cover.width > 0 && !Theme.perf: Image {
+                    source: AppState.now-cover;
+                    width: parent.width;
+                    height: parent.height;
+                }
+                if AppState.now-cover.width == 0 || Theme.perf: Icon {
+                    glyph: Glyphs.music;
+                    tint: Theme.accent;
+                    width: 22px;
+                    height: 22px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            min-width: 150px;
+            max-width: 150px;
+            Text {
+                text: AppState.now-title;
+                color: Theme.text;
+                font-size: 13px;
+                font-weight: 500;
+                overflow: elide;
+            }
+            if AppState.now-artist-id == "": Text {
+                text: AppState.now-detail;
+                color: Theme.text2;
+                font-size: 12px;
+                overflow: elide;
+            }
+            if AppState.now-artist-id != "": CreditLine {
+                text: AppState.now-detail;
+                artist: AppState.now-artist;
+                rest: AppState.now-rest;
+                artist-id: AppState.now-artist-id;
+                artist-clicked(id) => {
+                    AppState.open-artist(id);
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            HorizontalLayout {
+                spacing: 4px;
+                IconButton {
+                    glyph: Glyphs.shuffle;
+                    size: 32px;
+                    tint: Theme.text3;
+                    on: AppState.shuffle;
+                    tip: AppState.shuffle ? "Shuffle on" : "Shuffle";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-shuffle();
+                    }
+                }
+                IconButton {
+                    glyph: Glyphs.prev;
+                    tip: "Previous (Ctrl+Left)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.prev();
+                    }
+                }
+                IconButton {
+                    glyph: (AppState.active && !AppState.paused) ? Glyphs.pause : Glyphs.play;
+                    size: 44px;
+                    solid: true;
+                    tip: (AppState.active && !AppState.paused) ? "Pause (Space)" : "Play (Space)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-pause();
+                    }
+                }
+                IconButton {
+                    glyph: Glyphs.next;
+                    tip: "Next (Ctrl+Right)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.next();
+                    }
+                }
+                Rectangle {
+                    min-width: 32px;
+                    max-width: 32px;
+                    IconButton {
+                        glyph: Glyphs.repeat;
+                        size: 32px;
+                        tint: Theme.text3;
+                        on: AppState.repeat-mode > 0;
+                        tip: AppState.repeat-mode == 0 ? "Repeat" : (AppState.repeat-mode == 1 ? "Repeat all" : "Repeat one");
+                        enabled: !AppState.controls-locked;
+                        clicked => {
+                            AppState.cycle-repeat();
+                        }
+                    }
+                    if AppState.repeat-mode == 2: Text {
+                        text: "1";
+                        color: Theme.accent;
+                        font-size: 9px;
+                        font-weight: 500;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2 + 1px;
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            horizontal-stretch: 1;
+            Text {
+                text: AppState.pos-text;
+                color: Theme.text3;
+                font-size: 11px;
+                vertical-alignment: center;
+                horizontal-alignment: right;
+                min-width: 36px;
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                seek-bar := Scrub {
+                    value: Math.min(Math.max(AppState.progress, 0), 1);
+                    enabled: !AppState.controls-locked;
+                    bubble: AppState.duration-secs > 0 ? AppState.clock(seek-bar.hover-fraction * AppState.duration-secs) : "";
+                    committed(f) => {
+                        AppState.seek(f);
+                    }
+                }
+            }
+            Text {
+                text: AppState.dur-text;
+                color: Theme.text3;
+                font-size: 11px;
+                vertical-alignment: center;
+                min-width: 36px;
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            min-width: 120px;
+            max-width: 120px;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    glyph: Glyphs.volume;
+                    tint: Theme.text3;
+                    width: 18px;
+                    height: 18px;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                volume-bar := Scrub {
+                    value: AppState.volume;
+                    live: true;
+                    bubble: "\{Math.round(volume-bar.hover-fraction * 100)}%";
+                    committed(f) => {
+                        AppState.volume = f;
+                        AppState.set-volume(f);
+                    }
+                }
+            }
+        }
+    }
+}

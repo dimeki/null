@@ -1,0 +1,376 @@
+import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "../theme.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip, ChoiceChip } from "../components.slint";
+import { AppState } from "../state.slint";
+
+export component ScreenSettings inherits Rectangle {
+    vertical-stretch: 1;
+    ScrollList {
+        VerticalLayout {
+    alignment: start;
+    spacing: 2px;
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: ab-ta.has-hover ? Theme.hover : transparent;
+        ab-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Version " + AppState.app-version;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: AppState.update-checking ? "Checking…" : (AppState.update-available ? "Version " + AppState.update-version + " is available at " + AppState.update-host : (AppState.update-note != "" ? AppState.update-note : "Checks once a day"));
+                    font-size: 12px;
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                TextButton {
+                    label: AppState.update-available ? "Get update" : "Check now";
+                    clicked => {
+                        if AppState.update-available {
+                            AppState.open-update();
+                        } else {
+                            AppState.check-update();
+                        }
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Toggle {
+                    checked: AppState.auto-update-check;
+                    toggled(on) => {
+                        AppState.auto-update-check = on;
+                        AppState.set-auto-update(on);
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: pr-ta.has-hover ? Theme.hover : transparent;
+        pr-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Performance saving";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: "Turns off animations and covers, and refreshes the progress bar less often";
+                    font-size: 12px;
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Toggle {
+                    checked: AppState.perf-mode;
+                    toggled(on) => {
+                        AppState.perf-mode = on;
+                        AppState.set-perf(on);
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: th-ta.has-hover ? Theme.hover : transparent;
+        th-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Theme";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: Theme.names[AppState.theme-hover >= 0 ? AppState.theme-hover : Theme.palette];
+                    font-size: 12px;
+                    color: Theme.text2;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                HorizontalLayout {
+                    spacing: 8px;
+                    ThemeChip {
+                        index: 0;
+                        selected: Theme.palette == 0;
+                        picked => {
+                            Theme.palette = 0;
+                            AppState.set-theme(0);
+                        }
+                        hovered(on) => {
+                            AppState.theme-hover = on ? 0 : -1;
+                        }
+                    }
+                    for n[i] in 6: ThemeChip {
+                        index: i + 1;
+                        selected: Theme.palette == i + 1;
+                        picked => {
+                            Theme.palette = i + 1;
+                            AppState.set-theme(i + 1);
+                        }
+                        hovered(on) => {
+                            AppState.theme-hover = on ? i + 1 : -1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: lay-ta.has-hover ? Theme.hover : transparent;
+        lay-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Layout";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: "How the app is arranged";
+                    font-size: 12px;
+                    color: Theme.text2;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                HorizontalLayout {
+                    spacing: 8px;
+                    for name[i] in Theme.layout-names: ChoiceChip {
+                        label: name;
+                        selected: Theme.layout == i;
+                        picked => {
+                            Theme.layout = i;
+                            AppState.set-layout(i);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: ca-ta.has-hover ? Theme.hover : transparent;
+        ca-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Audio cache";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: AppState.cache-text;
+                    font-size: 12px;
+                    color: Theme.text2;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                TextButton {
+                    label: "Clear";
+                    clicked => {
+                        AppState.clear-cache();
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: yt-ta.has-hover ? Theme.hover : transparent;
+        yt-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "yt-dlp";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: AppState.ytdlp-note != "" ? AppState.ytdlp-note : (AppState.ytdlp-version != "" ? "Version " + AppState.ytdlp-version : "Checking version…");
+                    font-size: 12px;
+                    color: Theme.text2;
+                    wrap: word-wrap;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                TextButton {
+                    label: AppState.ytdlp-updating ? "Updating…" : "Update";
+                    clicked => {
+                        AppState.update-ytdlp();
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: ac-ta.has-hover ? Theme.hover : transparent;
+        ac-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Account";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: AppState.signed-in ? "Signed in with Google" : "Not signed in";
+                    font-size: 12px;
+                    color: Theme.text2;
+                }
+            }
+            if AppState.signed-in: VerticalLayout {
+                alignment: center;
+                TextButton {
+                    label: "Sign out";
+                    clicked => {
+                        AppState.sign-out();
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: nm-ta.has-hover ? Theme.hover : transparent;
+        nm-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Display name";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: "Shown to everyone in a party";
+                    font-size: 12px;
+                    color: Theme.text2;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                TextField {
+                    min-width: 220px;
+                    max-width: 220px;
+                    text <=> AppState.display-name;
+                    placeholder: "Your name";
+                    edited(t) => {
+                        AppState.display-name-edited(t);
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: sv-ta.has-hover ? Theme.hover : transparent;
+        sv-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Party server";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: AppState.party-server-built-in ? "Advanced. Leave empty to use the built-in server" : "The relay everyone in a party connects through";
+                    font-size: 12px;
+                    color: Theme.text2;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                TextField {
+                    min-width: 220px;
+                    max-width: 220px;
+                    text <=> AppState.party-server;
+                    placeholder: AppState.party-server-built-in ? "Built-in server" : "wss://your-relay.example.com";
+                    edited(t) => {
+                        AppState.party-server-edited(t);
+                    }
+                }
+            }
+        }
+    }
+    }
+}
+}
