@@ -15,6 +15,8 @@ mod party;
 mod state;
 mod thumbs;
 mod tray;
+#[cfg(test)]
+mod theme_tests;
 mod update;
 mod ytdlp;
 
@@ -135,6 +137,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let t = tx.clone();
     ui.on_seek(move |f| {
         let _ = t.send(Cmd::SeekFraction(f));
+    });
+    let t = tx.clone();
+    ui.on_set_theme(move |i| {
+        let _ = t.send(Cmd::SetTheme(i));
     });
     let t = tx.clone();
     ui.on_seek_by(move |secs| {

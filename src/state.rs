@@ -22,6 +22,8 @@ pub struct Saved {
     pub display_name: String,
     /// Look for a newer version when the app starts and once a day
     pub auto_update_check: bool,
+    /// Colour theme: 0 follows Windows, then the numbered palettes in ui/theme.slint
+    pub theme: i32,
 }
 
 pub fn save(path: &Path, s: &Saved) -> std::io::Result<()> {
@@ -39,6 +41,7 @@ pub fn save(path: &Path, s: &Saved) -> std::io::Result<()> {
     out.push_str(&format!("party_server={}\n", clean(&s.party_server)));
     out.push_str(&format!("name={}\n", clean(&s.display_name)));
     out.push_str(&format!("update_check={}\n", s.auto_update_check as u8));
+    out.push_str(&format!("theme={}\n", s.theme));
     for t in &s.queue {
         out.push_str(&format!(
             "track\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -73,6 +76,7 @@ pub fn load(path: &Path) -> Option<Saved> {
         party_server: String::new(),
         display_name: String::new(),
         auto_update_check: true,
+        theme: 0,
     };
     for line in lines {
         if let Some(rest) = line.strip_prefix("track\t") {
@@ -103,6 +107,7 @@ pub fn load(path: &Path) -> Option<Saved> {
                 "party_server" => s.party_server = v.trim().to_string(),
                 "name" => s.display_name = v.trim().to_string(),
                 "update_check" => s.auto_update_check = v != "0",
+                "theme" => s.theme = v.trim().parse().unwrap_or(0).clamp(0, 6),
                 _ => {}
             }
         }

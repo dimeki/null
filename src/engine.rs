@@ -121,6 +121,8 @@ pub enum Cmd {
     UpdateChecked { manual: bool, result: Result<Option<update::Release>, String> },
     OpenUpdate,
     SetAutoUpdate(bool),
+    /// The user picked a colour theme (0 follows Windows)
+    SetTheme(i32),
 }
 
 struct ArtistView {
@@ -309,6 +311,8 @@ struct Engine {
     update_checking: bool,
     update_note: String,
     auto_update: bool,
+    /// Colour theme: 0 follows Windows, then the palettes in ui/theme.slint
+    theme: i32,
     /// When the next automatic check is due (none while automatic checks are off)
     next_update_check: Option<Instant>,
 }
@@ -400,6 +404,7 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
         update_checking: false,
         update_note: String::new(),
         auto_update: true,
+        theme: 0,
         next_update_check: None,
     };
     eng.load_stored_auth();
@@ -604,6 +609,10 @@ impl Engine {
                 if let Some(release) = &self.update {
                     let _ = webbrowser::open(&release.url);
                 }
+            }
+            Cmd::SetTheme(theme) => {
+                self.theme = theme.clamp(0, 6);
+                self.dirty.set(true);
             }
             Cmd::SetAutoUpdate(on) => {
                 self.auto_update = on;
@@ -2053,6 +2062,9 @@ impl Engine {
         };
         self.party_server = saved.party_server;
         self.auto_update = saved.auto_update_check;
+        self.theme = saved.theme;
+        let theme = saved.theme;
+        let _ = self.ui.upgrade_in_event_loop(move |ui| ui.global::<Theme>().set_palette(theme));
         if !saved.display_name.is_empty() {
             self.display_name = saved.display_name;
         }
@@ -2098,6 +2110,7 @@ impl Engine {
             party_server: self.party_server.clone(),
             display_name: self.display_name.clone(),
             auto_update_check: self.auto_update,
+            theme: self.theme,
         };
         let _ = crate::state::save(&self.state_path, &saved);
         self.last_save = Instant::now();

@@ -24,26 +24,78 @@ export struct PartyMember {
     tag: string,
 }
 
+/// One complete set of colours. Add a theme by adding a block to `Theme.palettes`.
+export struct Colors {
+    bg: color,
+    /// A shade away from `bg`: the window alternates between the two to force a full repaint
+    bg-alt: color,
+    surface: color,
+    border: color,
+    border-strong: color,
+    hover: color,
+    text: color,
+    text2: color,
+    text3: color,
+    accent: color,
+    accent-bg: color,
+    /// Behind white text (primary buttons)
+    accent-fill: color,
+    danger: color,
+    success: color,
+    success-bg: color,
+    dark: bool,
+}
+
 export global Theme {
     /// Performance saving: no animations, no covers
     in-out property <bool> perf;
-    /// 0 follows Windows, 1 is always dark, 2 is always light
-    in-out property <int> scheme: 0;
-    out property <bool> dark: scheme == 1 || (scheme == 0 && Palette.color-scheme == ColorScheme.dark);
-    out property <color> bg: dark ? #1c1c1e : #ffffff;
-    out property <color> surface: dark ? #262629 : #f5f5f3;
-    out property <color> border: dark ? #3a3a3f : #e3e3df;
-    out property <color> border-strong: dark ? #55555c : #c9c9c3;
-    out property <color> hover: dark ? #ffffff14 : #0000000d;
-    out property <color> text: dark ? #f2f2f0 : #1a1a18;
-    out property <color> text2: dark ? #a9a9a3 : #66665f;
-    out property <color> text3: dark ? #78786f : #9a9a92;
-    out property <color> accent: dark ? #7ab2ff : #2b6de0;
-    out property <color> accent-bg: dark ? #25395a : #e4edfc;
-    out property <color> accent-fill: dark ? #3b7be8 : #2b6de0;
-    out property <color> danger: dark ? #ff8a80 : #c92a2a;
-    out property <color> success: dark ? #7fd89b : #1f8a4c;
-    out property <color> success-bg: dark ? #1f3a2a : #e1f3e8;
+    /// 0 follows Windows (Dark or Light), then 1 to 6 are the entries of `palettes`, in order
+    in-out property <int> palette: 0;
+    out property <[string]> names: ["Windows", "Dark", "Light", "Slate", "Ember", "Paper", "Black"];
+    property <int> p: palette == 0 ? (Palette.color-scheme == ColorScheme.dark ? 1 : 2) : palette;
+    out property <[Colors]> palettes: [
+        // 1 Dark
+        { bg: #1c1c1e, bg-alt: #1d1d1f, surface: #262629, border: #3a3a3f, border-strong: #55555c, hover: #ffffff14,
+          text: #f2f2f0, text2: #a9a9a3, text3: #8f8f87, accent: #7ab2ff, accent-bg: #25395a, accent-fill: #316fe0,
+          danger: #ff8a80, success: #7fd89b, success-bg: #1f3a2a, dark: true },
+        // 2 Light
+        { bg: #ffffff, bg-alt: #fdfdfd, surface: #f5f5f3, border: #e3e3df, border-strong: #c9c9c3, hover: #0000000d,
+          text: #1a1a18, text2: #66665f, text3: #6f6f68, accent: #2459cf, accent-bg: #e4edfc, accent-fill: #2459cf,
+          danger: #c92a2a, success: #1f8a4c, success-bg: #e1f3e8, dark: false },
+        // 3 Slate: cool, bluish dark
+        { bg: #17181c, bg-alt: #18191d, surface: #212228, border: #2c2e36, border-strong: #484a55, hover: #ffffff14,
+          text: #f1f1ef, text2: #a4a6ae, text3: #8c8e97, accent: #7ab2ff, accent-bg: #22304d, accent-fill: #316fe0,
+          danger: #ff8a80, success: #7fd89b, success-bg: #1f3a2a, dark: true },
+        // 4 Ember: warm dark with an orange accent
+        { bg: #1d1613, bg-alt: #1e1714, surface: #2a201b, border: #3a2d26, border-strong: #55443a, hover: #ffffff14,
+          text: #f6efe9, text2: #bfaea3, text3: #a08f84, accent: #ffb26b, accent-bg: #47301f, accent-fill: #b8581a,
+          danger: #ff8a80, success: #7fd89b, success-bg: #1f3a2a, dark: true },
+        // 5 Paper: warm, light
+        { bg: #f5f3ee, bg-alt: #f3f1ec, surface: #ffffff, border: #e3dfd5, border-strong: #c9c3b4, hover: #0000000d,
+          text: #1e1c17, text2: #6a665c, text3: #716c64, accent: #2459cf, accent-bg: #e1eafb, accent-fill: #2459cf,
+          danger: #c92a2a, success: #1f8a4c, success-bg: #e0f1e6, dark: false },
+        // 6 Black: true black for OLED screens
+        { bg: #000000, bg-alt: #010101, surface: #141416, border: #26262a, border-strong: #4a4a50, hover: #ffffff14,
+          text: #f2f2f0, text2: #a9a9a3, text3: #8f8f87, accent: #7ab2ff, accent-bg: #16253d, accent-fill: #316fe0,
+          danger: #ff8a80, success: #7fd89b, success-bg: #17301f, dark: true },
+    ];
+    out property <Colors> c: palettes[p - 1];
+    out property <bool> dark: c.dark;
+    out property <color> bg: c.bg;
+    out property <color> bg-alt: c.bg-alt;
+    out property <color> surface: c.surface;
+    out property <color> border: c.border;
+    out property <color> border-strong: c.border-strong;
+    out property <color> hover: c.hover;
+    out property <color> text: c.text;
+    out property <color> text2: c.text2;
+    out property <color> text3: c.text3;
+    out property <color> accent: c.accent;
+    out property <color> accent-bg: c.accent-bg;
+    out property <color> accent-fill: c.accent-fill;
+    out property <color> danger: c.danger;
+    out property <color> success: c.success;
+    out property <color> success-bg: c.success-bg;
     out property <duration> fade: perf ? 0ms : 120ms;
 }
 

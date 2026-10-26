@@ -2,7 +2,7 @@
 //!
 //!   cargo run --release --features gallery -- --gallery <folder>
 //!
-//! Fills the window with made-up data and writes a PNG of every screen, in dark and light,
+//! Fills the window with made-up data and writes a PNG of every screen, in every theme,
 //! plus an index.html to look at them all together. It draws into memory, so no window
 //! appears and nothing is clicked. Use it after changing the interface to see every screen at once.
 
@@ -301,8 +301,8 @@ pub fn run(out: PathBuf) -> Result<(), slint::PlatformError> {
     ui.show()?;
 
     let mut shots: Vec<(String, String)> = Vec::new();
-    for (scheme, scheme_name) in [(1, "dark"), (2, "light")] {
-        ui.global::<Theme>().set_scheme(scheme);
+    for (palette, scheme_name) in [(1, "dark"), (2, "light"), (3, "slate"), (4, "ember"), (5, "paper"), (6, "black")] {
+        ui.global::<Theme>().set_palette(palette);
         for (n, (name, setup)) in scenes().iter().enumerate() {
             base(&ui);
             setup(&ui);
@@ -340,7 +340,9 @@ fn write_index(out: &Path, shots: &[(String, String)]) -> std::io::Result<()> {
          h2{margin:28px 0 10px}.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(480px,1fr));gap:16px}figure{margin:0}img{width:100%;border-radius:8px;border:1px solid #333}\
          figcaption{margin:4px 2px;color:#999}</style>",
     );
-    for scheme in ["dark", "light"] {
+    let mut names: Vec<&str> = shots.iter().map(|(s, _)| s.as_str()).collect();
+    names.dedup();
+    for scheme in names {
         html.push_str(&format!("<h2>{scheme}</h2><div class=g>"));
         for (s, file) in shots.iter().filter(|(s, _)| s == scheme) {
             let label = file.trim_end_matches(".png").trim_start_matches(&format!("{s}-"));
