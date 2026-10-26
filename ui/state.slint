@@ -49,6 +49,10 @@ export global AppState {
     callback artist-back();
     callback close-artist();
     in-out property <image> now-cover;
+    /// A larger version of the cover, fetched only while the art-first layout is on
+    in-out property <image> now-cover-big;
+    /// The cover's average colour (fully transparent when there is no cover); layouts tint from it
+    in-out property <color> now-tint;
     in-out property <string> pos-text: "0:00";
     in-out property <string> dur-text: "0:00";
     in-out property <float> duration-secs;

@@ -8,13 +8,13 @@ Everything is in `ui/`:
 - `screens/*.slint`: one file per screen (search, library, playlist, artist, lyrics, party, settings, sign-in)
 - `chrome-*.slint`: the parts around the screens (tab bar, sidebar, queue, player bar, update notice)
 - `screen-host.slint`: picks which screen to show. Every layout puts it where its content goes
-- `layout-*.slint`: how it is all arranged. `layout-tabs.slint` is the original, `layout-sidebar.slint` the sidebar one
+- `layout-*.slint`: how it is all arranged: `layout-tabs.slint` is the original, `layout-sidebar.slint` has a sidebar and a centred player bar, `layout-art.slint` puts a big cover and the player in a left column
 - `app.slint`: the two windows and the keyboard shortcuts
 
 ## Adding a layout
 
 Copy `layout-sidebar.slint`, arrange `SideNav` or `TabBar`, `ScreenHost`, `QueuePanel` and `PlayerBar` as you like,
-give it the next number in `Theme.layout-names` (and the `clamp` in `state.rs` and `engine.rs`), and add an
+give it the next number in `Theme.layout-names` (and the `clamp(0, N)` in `state.rs` and `engine.rs`), and add an
 `if Theme.layout == N: ...` line in `app.slint`. Nothing about the screens changes.
 
 ## Adding a theme

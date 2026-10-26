@@ -2,6 +2,7 @@ import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "them
 import { AppState } from "state.slint";
 import { LayoutTabs } from "layout-tabs.slint";
 import { LayoutSidebar } from "layout-sidebar.slint";
+import { LayoutArt } from "layout-art.slint";
 export { TrackItem, LyricLine, PartyMember, Theme, TipState } from "theme.slint";
 export { AppState } from "state.slint";
 
@@ -89,6 +90,7 @@ export component MainWindow inherits Window {
         }
         if Theme.layout == 0: LayoutTabs { }
         if Theme.layout == 1: LayoutSidebar { }
+        if Theme.layout == 2: LayoutArt { }
 
     if TipState.shown && TipState.text != "": Rectangle {
         z: 100;

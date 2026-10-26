@@ -24,7 +24,7 @@ pub struct Saved {
     pub auto_update_check: bool,
     /// Colour theme: 0 follows Windows, then the numbered palettes in ui/theme.slint
     pub theme: i32,
-    /// Layout: 0 tabs along the top, 1 a sidebar
+    /// Layout: 0 tabs along the top, 1 a sidebar, 2 art first
     pub layout: i32,
 }
 
@@ -112,7 +112,7 @@ pub fn load(path: &Path) -> Option<Saved> {
                 "name" => s.display_name = v.trim().to_string(),
                 "update_check" => s.auto_update_check = v != "0",
                 "theme" => s.theme = v.trim().parse().unwrap_or(0).clamp(0, 6),
-                "layout" => s.layout = v.trim().parse().unwrap_or(0).clamp(0, 1),
+                "layout" => s.layout = v.trim().parse().unwrap_or(0).clamp(0, 2),
                 _ => {}
             }
         }

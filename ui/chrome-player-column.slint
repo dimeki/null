@@ -1,0 +1,195 @@
+import { Theme, Glyphs } from "theme.slint";
+import { Icon, IconButton, Scrub, CreditLine } from "components.slint";
+import { AppState } from "state.slint";
+
+/// The player as a column down the left: a big cover, what is playing, the seek bar and the
+/// controls, with the volume at the bottom. The cover's colour tints the background (not in
+/// performance saving, which has no covers).
+export component PlayerColumn inherits Rectangle {
+    background: @linear-gradient(180deg, (AppState.now-cover.width > 0 && !Theme.perf ? AppState.now-tint.with-alpha(0.34) : #00000000) 0%, #00000000 80%);
+    VerticalLayout {
+        padding: 18px;
+        spacing: 0px;
+        Rectangle {
+            height: 212px;
+            border-radius: 12px;
+            background: Theme.accent-bg;
+            clip: true;
+            // the small cover shows at once, and the big one replaces it when it arrives
+            if AppState.now-cover.width > 0 && !Theme.perf: Image {
+                source: AppState.now-cover-big.width > 0 ? AppState.now-cover-big : AppState.now-cover;
+                width: parent.width;
+                height: parent.height;
+            }
+            if AppState.now-cover.width == 0 || Theme.perf: Icon {
+                glyph: Glyphs.music;
+                tint: Theme.accent;
+                width: 56px;
+                height: 56px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+        Text {
+            text: AppState.now-title;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 500;
+            wrap: word-wrap;
+            overflow: elide;
+            height: 44px;
+            vertical-alignment: bottom;
+        }
+        if AppState.now-artist-id == "": Text {
+            text: AppState.now-detail;
+            color: Theme.text2;
+            font-size: 12px;
+            overflow: elide;
+        }
+        if AppState.now-artist-id != "": CreditLine {
+            text: AppState.now-detail;
+            artist: AppState.now-artist;
+            rest: AppState.now-rest;
+            artist-id: AppState.now-artist-id;
+            artist-clicked(id) => {
+                AppState.open-artist(id);
+            }
+        }
+        Rectangle {
+            height: 14px;
+        }
+        seek-bar := Scrub {
+            value: Math.min(Math.max(AppState.progress, 0), 1);
+            enabled: !AppState.controls-locked;
+            bubble: AppState.duration-secs > 0 ? AppState.clock(seek-bar.hover-fraction * AppState.duration-secs) : "";
+            committed(f) => {
+                AppState.seek(f);
+            }
+        }
+        HorizontalLayout {
+            height: 16px;
+            Text {
+                text: AppState.pos-text;
+                color: Theme.text3;
+                font-size: 11px;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: AppState.dur-text;
+                color: Theme.text3;
+                font-size: 11px;
+                horizontal-alignment: right;
+            }
+        }
+        HorizontalLayout {
+            height: 48px;
+            alignment: space-between;
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: Glyphs.shuffle;
+                    size: 32px;
+                    tint: Theme.text3;
+                    on: AppState.shuffle;
+                    tip: AppState.shuffle ? "Shuffle on" : "Shuffle";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-shuffle();
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: Glyphs.prev;
+                    tip: "Previous (Ctrl+Left)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.prev();
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: (AppState.active && !AppState.paused) ? Glyphs.pause : Glyphs.play;
+                    size: 44px;
+                    solid: true;
+                    tip: (AppState.active && !AppState.paused) ? "Pause (Space)" : "Play (Space)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-pause();
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: Glyphs.next;
+                    tip: "Next (Ctrl+Right)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.next();
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    min-width: 32px;
+                    max-width: 32px;
+                    min-height: 32px;
+                    max-height: 32px;
+                    IconButton {
+                        glyph: Glyphs.repeat;
+                        size: 32px;
+                        tint: Theme.text3;
+                        on: AppState.repeat-mode > 0;
+                        tip: AppState.repeat-mode == 0 ? "Repeat" : (AppState.repeat-mode == 1 ? "Repeat all" : "Repeat one");
+                        enabled: !AppState.controls-locked;
+                        clicked => {
+                            AppState.cycle-repeat();
+                        }
+                    }
+                    if AppState.repeat-mode == 2: Text {
+                        text: "1";
+                        color: Theme.accent;
+                        font-size: 9px;
+                        font-weight: 500;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2 + 1px;
+                    }
+                }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+        }
+        HorizontalLayout {
+            height: 26px;
+            spacing: 8px;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    glyph: Glyphs.volume;
+                    tint: Theme.text3;
+                    width: 18px;
+                    height: 18px;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                volume-bar := Scrub {
+                    value: AppState.volume;
+                    live: true;
+                    bubble: "\{Math.round(volume-bar.hover-fraction * 100)}%";
+                    committed(f) => {
+                        AppState.volume = f;
+                        AppState.set-volume(f);
+                    }
+                }
+            }
+        }
+    }
+}

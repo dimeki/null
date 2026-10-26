@@ -46,10 +46,13 @@ impl Platform for GalleryPlatform {
 }
 
 fn cover(top: [u8; 3], bottom: [u8; 3]) -> Image {
-    const N: u32 = 64;
-    let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(N, N);
+    cover_sized(64, top, bottom)
+}
+
+fn cover_sized(n: u32, top: [u8; 3], bottom: [u8; 3]) -> Image {
+    let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(n, n);
     for (i, px) in buf.make_mut_slice().iter_mut().enumerate() {
-        let t = (i as u32 / N) as f32 / (N - 1) as f32;
+        let t = (i as u32 / n) as f32 / (n - 1) as f32;
         let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t) as u8;
         *px = Rgba8Pixel { r: mix(top[0], bottom[0]), g: mix(top[1], bottom[1]), b: mix(top[2], bottom[2]), a: 255 };
     }
@@ -152,6 +155,8 @@ fn base(ui: &MainWindow) {
     ui.global::<AppState>().set_now_rest("Album name".into());
     ui.global::<AppState>().set_now_artist_id(ARTIST.into());
     ui.global::<AppState>().set_now_cover(covers()[0].clone());
+    ui.global::<AppState>().set_now_cover_big(cover_sized(crate::thumbs::BIG, [70, 110, 190], [25, 40, 90]));
+    ui.global::<AppState>().set_now_tint(slint::Color::from_rgb_u8(47, 75, 140));
     ui.global::<AppState>().set_active(true);
     ui.global::<AppState>().set_paused(false);
     ui.global::<AppState>().set_loading(false);
@@ -280,6 +285,8 @@ fn scenes() -> Vec<Scene> {
             ui.global::<AppState>().set_now_rest("".into());
             ui.global::<AppState>().set_now_artist_id("".into());
             ui.global::<AppState>().set_now_cover(Image::default());
+            ui.global::<AppState>().set_now_cover_big(Image::default());
+            ui.global::<AppState>().set_now_tint(slint::Color::from_argb_u8(0, 0, 0, 0));
             ui.global::<AppState>().set_active(false);
             ui.global::<AppState>().set_pos_text("0:00".into());
             ui.global::<AppState>().set_dur_text("0:00".into());
@@ -303,7 +310,7 @@ pub fn run(out: PathBuf) -> Result<(), slint::PlatformError> {
 
     // (section heading, caption, file name)
     let mut shots: Vec<(String, String, String)> = Vec::new();
-    for (layout, layout_name) in [(0, "tabs"), (1, "sidebar")] {
+    for (layout, layout_name) in [(0, "tabs"), (1, "sidebar"), (2, "art")] {
         ui.global::<Theme>().set_layout(layout);
         for (palette, scheme_name) in [(1, "dark"), (2, "light"), (3, "slate"), (4, "ember"), (5, "paper"), (6, "black")] {
             ui.global::<Theme>().set_palette(palette);

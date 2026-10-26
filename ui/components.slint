@@ -821,3 +821,29 @@ export component ChoiceChip inherits Rectangle {
         }
     }
 }
+
+/// A rounded tab for the header of the art-first layout
+export component PillTab inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked();
+    height: 30px;
+    min-width: pill-text.preferred-width + 28px;
+    border-radius: 15px;
+    background: root.active ? Theme.accent-bg : (pill-ta.has-hover ? Theme.hover : transparent);
+    animate background { duration: Theme.fade; }
+    pill-text := Text {
+        text: root.label;
+        font-size: 13px;
+        font-weight: root.active ? 500 : 400;
+        color: root.active ? Theme.accent : Theme.text2;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    pill-ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}

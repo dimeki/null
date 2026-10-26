@@ -1,0 +1,25 @@
+import { Theme } from "theme.slint";
+import { PlayerColumn } from "chrome-player-column.slint";
+import { HeaderBar } from "chrome-header.slint";
+import { ScreenHost } from "screen-host.slint";
+
+/// The cover and player in a column down the left, with the screens beside it. No bottom bar.
+export component LayoutArt inherits HorizontalLayout {
+    PlayerColumn {
+        min-width: 250px;
+        max-width: 250px;
+    }
+    Rectangle {
+        width: 1px;
+        background: Theme.border;
+    }
+    VerticalLayout {
+        padding: 14px;
+        spacing: 12px;
+        horizontal-stretch: 1;
+        HeaderBar { }
+        ScreenHost {
+            vertical-stretch: 1;
+        }
+    }
+}

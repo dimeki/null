@@ -52,9 +52,9 @@ export global Theme {
     /// 0 follows Windows (Dark or Light), then 1 to 6 are the entries of `palettes`, in order
     in-out property <int> palette: 0;
     out property <[string]> names: ["Windows", "Dark", "Light", "Slate", "Ember", "Paper", "Black"];
-    /// 0 is tabs along the top, 1 is a sidebar
+    /// 0 is tabs along the top, 1 a sidebar, 2 the cover and player in a left column
     in-out property <int> layout: 0;
-    out property <[string]> layout-names: ["Tabs", "Sidebar"];
+    out property <[string]> layout-names: ["Tabs", "Sidebar", "Art first"];
     property <int> p: palette == 0 ? (Palette.color-scheme == ColorScheme.dark ? 1 : 2) : palette;
     out property <[Colors]> palettes: [
         // 1 Dark
