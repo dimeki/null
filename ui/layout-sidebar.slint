@@ -1,6 +1,6 @@
 import { Theme } from "theme.slint";
 import { SideNav } from "chrome-sidebar.slint";
-import { PlayerBar } from "chrome-player.slint";
+import { PlayerBarCentered } from "chrome-player-centered.slint";
 import { ScreenHost } from "screen-host.slint";
 
 /// Navigation down the left, screens beside it (the queue is a screen of its own), the player along the bottom
@@ -27,5 +27,5 @@ export component LayoutSidebar inherits VerticalLayout {
         height: 1px;
         background: Theme.border;
     }
-    PlayerBar { }
+    PlayerBarCentered { }
 }

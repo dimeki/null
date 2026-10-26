@@ -1,0 +1,205 @@
+import { Theme, Glyphs } from "theme.slint";
+import { Icon, IconButton, Scrub, CreditLine } from "components.slint";
+import { AppState } from "state.slint";
+
+/// The player bar with its controls in the middle and the seek bar right under them.
+/// The title takes all the room it needs on the left, and the volume sits on the right.
+export component PlayerBarCentered inherits Rectangle {
+    height: 84px;
+    background: Theme.surface;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 18px;
+        spacing: 16px;
+        // what is playing
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 180px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    min-width: 54px;
+                    max-width: 54px;
+                    min-height: 54px;
+                    max-height: 54px;
+                    border-radius: 6px;
+                    background: Theme.accent-bg;
+                    clip: true;
+                    if AppState.now-cover.width > 0 && !Theme.perf: Image {
+                        source: AppState.now-cover;
+                        width: parent.width;
+                        height: parent.height;
+                    }
+                    if AppState.now-cover.width == 0 || Theme.perf: Icon {
+                        glyph: Glyphs.music;
+                        tint: Theme.accent;
+                        width: 24px;
+                        height: 24px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 1px;
+                Text {
+                    text: AppState.now-title;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 500;
+                    overflow: elide;
+                }
+                if AppState.now-artist-id == "": Text {
+                    text: AppState.now-detail;
+                    color: Theme.text2;
+                    font-size: 12px;
+                    overflow: elide;
+                }
+                if AppState.now-artist-id != "": CreditLine {
+                    text: AppState.now-detail;
+                    artist: AppState.now-artist;
+                    rest: AppState.now-rest;
+                    artist-id: AppState.now-artist-id;
+                    artist-clicked(id) => {
+                        AppState.open-artist(id);
+                    }
+                }
+            }
+        }
+        // controls, with the seek bar underneath
+        VerticalLayout {
+            horizontal-stretch: 2;
+            min-width: 300px;
+            max-width: 560px;
+            alignment: center;
+            spacing: 4px;
+            HorizontalLayout {
+                alignment: center;
+                spacing: 10px;
+                IconButton {
+                    glyph: Glyphs.shuffle;
+                    size: 32px;
+                    tint: Theme.text3;
+                    on: AppState.shuffle;
+                    tip: AppState.shuffle ? "Shuffle on" : "Shuffle";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-shuffle();
+                    }
+                }
+                IconButton {
+                    glyph: Glyphs.prev;
+                    tip: "Previous (Ctrl+Left)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.prev();
+                    }
+                }
+                IconButton {
+                    glyph: (AppState.active && !AppState.paused) ? Glyphs.pause : Glyphs.play;
+                    size: 40px;
+                    solid: true;
+                    tip: (AppState.active && !AppState.paused) ? "Pause (Space)" : "Play (Space)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-pause();
+                    }
+                }
+                IconButton {
+                    glyph: Glyphs.next;
+                    tip: "Next (Ctrl+Right)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.next();
+                    }
+                }
+                Rectangle {
+                    min-width: 32px;
+                    max-width: 32px;
+                    IconButton {
+                        glyph: Glyphs.repeat;
+                        size: 32px;
+                        tint: Theme.text3;
+                        on: AppState.repeat-mode > 0;
+                        tip: AppState.repeat-mode == 0 ? "Repeat" : (AppState.repeat-mode == 1 ? "Repeat all" : "Repeat one");
+                        enabled: !AppState.controls-locked;
+                        clicked => {
+                            AppState.cycle-repeat();
+                        }
+                    }
+                    if AppState.repeat-mode == 2: Text {
+                        text: "1";
+                        color: Theme.accent;
+                        font-size: 9px;
+                        font-weight: 500;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2 + 1px;
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: AppState.pos-text;
+                    color: Theme.text3;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                    horizontal-alignment: right;
+                    min-width: 36px;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    seek-bar := Scrub {
+                        value: Math.min(Math.max(AppState.progress, 0), 1);
+                        enabled: !AppState.controls-locked;
+                        bubble: AppState.duration-secs > 0 ? AppState.clock(seek-bar.hover-fraction * AppState.duration-secs) : "";
+                        committed(f) => {
+                            AppState.seek(f);
+                        }
+                    }
+                }
+                Text {
+                    text: AppState.dur-text;
+                    color: Theme.text3;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                    min-width: 36px;
+                }
+            }
+        }
+        // volume
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            min-width: 150px;
+            alignment: end;
+            spacing: 6px;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    glyph: Glyphs.volume;
+                    tint: Theme.text3;
+                    width: 18px;
+                    height: 18px;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                min-width: 110px;
+                max-width: 110px;
+                volume-bar := Scrub {
+                    value: AppState.volume;
+                    live: true;
+                    bubble: "\{Math.round(volume-bar.hover-fraction * 100)}%";
+                    committed(f) => {
+                        AppState.volume = f;
+                        AppState.set-volume(f);
+                    }
+                }
+            }
+        }
+    }
+}
