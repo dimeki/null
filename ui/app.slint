@@ -26,6 +26,16 @@ export component MainWindow inherits Window {
     // Changing AppState.repaint-nonce by one makes the whole window repaint (see state.slint)
     background: Math.mod(AppState.repaint-nonce, 2) == 0 ? Theme.bg : Theme.bg-alt;
     default-font-size: 13px;
+    changed width => {
+        AppState.win-w = self.width;
+    }
+    changed height => {
+        AppState.win-h = self.height;
+    }
+    init => {
+        AppState.win-w = self.width;
+        AppState.win-h = self.height;
+    }
 
 
     /// Clears the no-animation flag a moment after a shortcut key has moved between screens

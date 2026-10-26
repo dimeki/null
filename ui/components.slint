@@ -437,6 +437,195 @@ export component CreditLine inherits HorizontalLayout {
     }
 }
 
+export component MenuDivider inherits Rectangle {
+    height: 9px;
+    Rectangle {
+        y: 4px;
+        height: 1px;
+        background: Theme.border;
+    }
+}
+
+export component MenuEntry inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected;
+    in property <bool> danger: false;
+    callback chosen;
+    callback hovered;
+    height: 30px;
+    border-radius: 7px;
+    background: root.selected ? (root.danger ? Theme.danger.with-alpha(0.14) : Theme.accent-bg) : transparent;
+    Text {
+        x: 10px;
+        text: root.label;
+        vertical-alignment: center;
+        height: parent.height;
+        font-size: 13px;
+        color: root.danger ? Theme.danger : (root.selected ? Theme.accent : Theme.text);
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        changed has-hover => {
+            if (self.has-hover) {
+                root.hovered();
+            }
+        }
+        clicked => {
+            root.chosen();
+        }
+    }
+}
+
+/// The right-click menu of a song row. Items that do not apply to the row are left out.
+export component RowMenu inherits Rectangle {
+    in property <bool> add;
+    in property <bool> remove;
+    in property <bool> artist;
+    /// 0 Play next, 1 Add to queue, 2 Go to artist, 3 Copy link, 4 Open on YouTube Music, 5 Remove
+    callback chosen(int);
+    property <length> px;
+    property <length> py;
+    // padding, then each entry, then the dividers
+    property <length> ph: 10px + 30px * (3 + (root.add ? 1 : 0) + (root.artist ? 1 : 0) + (root.remove ? 1 : 0)) + 9px * (1 + (root.remove ? 1 : 0));
+    x: 0px;
+    y: 0px;
+    width: 0px;
+    height: 0px;
+    /// Opens with its corner at (x, y) in the row, or flipped to stay inside the window.
+    /// ax and ay are the same point in window coordinates.
+    public function open(x: length, y: length, ax: length, ay: length) {
+        root.px = (ax + 216px > AppState.win-w) ? x - 216px : x;
+        root.py = (ay + root.ph > AppState.win-h) ? y - root.ph : y;
+        pm.show();
+    }
+    pm := PopupWindow {
+        x: root.px;
+        y: root.py;
+        width: 216px;
+        height: root.ph;
+        close-policy: close-on-click-outside;
+        card := Rectangle {
+            property <float> t: 0;
+            property <float> p: Math.min(1.0, self.t / (Theme.fade / 1s));
+            property <[bool]> vis: [true, root.add, root.artist, true, true, root.remove];
+            property <int> sel: -1;
+            pure function next(s: int) -> int {
+                return (s < 1 && self.vis[1]) ? 1 : (s < 2 && self.vis[2]) ? 2 : (s < 3 && self.vis[3]) ? 3 : (s < 4 && self.vis[4]) ? 4 : (s < 5 && self.vis[5]) ? 5 : s;
+            }
+            pure function prev(s: int) -> int {
+                return (s > 4 && self.vis[4]) ? 4 : (s > 3 && self.vis[3]) ? 3 : (s > 2 && self.vis[2]) ? 2 : (s > 1 && self.vis[1]) ? 1 : (s > 0 && self.vis[0]) ? 0 : s;
+            }
+            function run(i: int) {
+                pm.close();
+                root.chosen(i);
+            }
+            opacity: Theme.fade == 0ms ? 1.0 : 1.0 - Math.pow(1.0 - self.p, 3);
+            background: Theme.surface;
+            border-radius: 11px;
+            border-width: 1px;
+            border-color: Theme.border-strong;
+            Timer {
+                interval: 16ms;
+                running: card.t < 0.3 && Theme.fade != 0ms;
+                triggered => {
+                    card.t += 0.016;
+                }
+            }
+            FocusScope {
+                init => {
+                    self.focus();
+                }
+                key-pressed(e) => {
+                    if (e.text == Key.Escape) {
+                        pm.close();
+                        return accept;
+                    }
+                    if (e.text == Key.DownArrow) {
+                        card.sel = card.next(card.sel);
+                        return accept;
+                    }
+                    if (e.text == Key.UpArrow) {
+                        card.sel = card.sel < 0 ? 0 : card.prev(card.sel);
+                        return accept;
+                    }
+                    if ((e.text == Key.Return || e.text == " ") && card.sel >= 0) {
+                        card.run(card.sel);
+                        return accept;
+                    }
+                    reject
+                }
+            }
+            VerticalLayout {
+                padding: 5px;
+                spacing: 0px;
+                MenuEntry {
+                    label: "Play next";
+                    selected: card.sel == 0;
+                    chosen => {
+                        card.run(0);
+                    }
+                    hovered => {
+                        card.sel = 0;
+                    }
+                }
+                if root.add: MenuEntry {
+                    label: "Add to queue";
+                    selected: card.sel == 1;
+                    chosen => {
+                        card.run(1);
+                    }
+                    hovered => {
+                        card.sel = 1;
+                    }
+                }
+                MenuDivider { }
+                if root.artist: MenuEntry {
+                    label: "Go to artist";
+                    selected: card.sel == 2;
+                    chosen => {
+                        card.run(2);
+                    }
+                    hovered => {
+                        card.sel = 2;
+                    }
+                }
+                MenuEntry {
+                    label: "Copy link";
+                    selected: card.sel == 3;
+                    chosen => {
+                        card.run(3);
+                    }
+                    hovered => {
+                        card.sel = 3;
+                    }
+                }
+                MenuEntry {
+                    label: "Open on YouTube Music";
+                    selected: card.sel == 4;
+                    chosen => {
+                        card.run(4);
+                    }
+                    hovered => {
+                        card.sel = 4;
+                    }
+                }
+                if root.remove: MenuDivider { }
+                if root.remove: MenuEntry {
+                    label: "Remove from queue";
+                    danger: true;
+                    selected: card.sel == 5;
+                    chosen => {
+                        card.run(5);
+                    }
+                    hovered => {
+                        card.sel = 5;
+                    }
+                }
+            }
+        }
+    }
+}
+
 export component TrackRow inherits Rectangle {
     in property <TrackItem> item;
     callback artist-clicked(string);
@@ -471,6 +660,10 @@ export component TrackRow inherits Rectangle {
     callback menu-remove-clicked();
     callback menu-copy-link(string);
     callback menu-open-web(string);
+    /// Opens the menu with its corner at the pointer
+    function open-menu(x: length, y: length) {
+        row-menu.open(x, y, self.absolute-position.x + x, self.absolute-position.y + y);
+    }
     height: 48px;
     border-radius: 8px;
     opacity: root.dragging ? 0.55 : 1;
@@ -487,6 +680,11 @@ export component TrackRow inherits Rectangle {
             }
         }
         pointer-event(e) => {
+            if (e.kind == PointerEventKind.down && e.button == PointerEventButton.right && root.menu) {
+                TipState.shown = false;
+                root.open-menu(row-ta.mouse-x, row-ta.mouse-y);
+                return;
+            }
             if (e.kind == PointerEventKind.down) {
                 root.was-dragged = false;
             }
@@ -615,47 +813,23 @@ export component TrackRow inherits Rectangle {
             }
         }
     }
-    if root.menu: ContextMenuArea {
-        Menu {
-            MenuItem {
-                title: "Play next";
-                activated => {
-                    root.menu-play-next();
-                }
-            }
-            MenuItem {
-                title: "Add to queue";
-                enabled: root.menu-add;
-                activated => {
-                    root.menu-add-clicked();
-                }
-            }
-            MenuItem {
-                title: "Remove from queue";
-                enabled: root.menu-remove;
-                activated => {
-                    root.menu-remove-clicked();
-                }
-            }
-            MenuSeparator { }
-            MenuItem {
-                title: "Go to artist";
-                enabled: root.item.artist-id != "";
-                activated => {
-                    root.artist-clicked(root.item.artist-id);
-                }
-            }
-            MenuItem {
-                title: "Copy link";
-                activated => {
-                    root.menu-copy-link("https://music.youtube.com/watch?v=" + root.item.id);
-                }
-            }
-            MenuItem {
-                title: "Open on YouTube Music";
-                activated => {
-                    root.menu-open-web(root.item.id);
-                }
+    row-menu := RowMenu {
+        add: root.menu-add;
+        remove: root.menu-remove;
+        artist: root.item.artist-id != "";
+        chosen(i) => {
+            if (i == 0) {
+                root.menu-play-next();
+            } else if (i == 1) {
+                root.menu-add-clicked();
+            } else if (i == 2) {
+                root.artist-clicked(root.item.artist-id);
+            } else if (i == 3) {
+                root.menu-copy-link("https://music.youtube.com/watch?v=" + root.item.id);
+            } else if (i == 4) {
+                root.menu-open-web(root.item.id);
+            } else {
+                root.menu-remove-clicked();
             }
         }
     }

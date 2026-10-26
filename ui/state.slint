@@ -8,6 +8,9 @@ export global AppState {
     in-out property <int> repaint-nonce;
     /// Set while a shortcut key moves between screens: nothing should animate then
     in-out property <bool> skip-anim;
+    /// Window size, so popups can stay inside it
+    in-out property <length> win-w;
+    in-out property <length> win-h;
     /// Screens bump this to give the keyboard back to the window's shortcuts (after the search box)
     in-out property <int> keys-focus-nonce;
     in-out property <string> query;
