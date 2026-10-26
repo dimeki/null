@@ -1,5 +1,5 @@
 import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "theme.slint";
-import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "components.slint";
+import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip, CoverImage, FadeText } from "components.slint";
 import { AppState } from "state.slint";
 
 export component PlayerBar inherits Rectangle {
@@ -11,35 +11,22 @@ export component PlayerBar inherits Rectangle {
         spacing: 12px;
         VerticalLayout {
             alignment: center;
-            Rectangle {
+            CoverImage {
+                source: AppState.now-cover;
                 min-width: 48px;
                 max-width: 48px;
                 min-height: 48px;
                 max-height: 48px;
                 border-radius: 6px;
-                background: Theme.accent-bg;
-                clip: true;
-                if AppState.now-cover.width > 0 && !Theme.perf: Image {
-                    source: AppState.now-cover;
-                    width: parent.width;
-                    height: parent.height;
-                }
-                if AppState.now-cover.width == 0 || Theme.perf: Icon {
-                    glyph: Glyphs.music;
-                    tint: Theme.accent;
-                    width: 22px;
-                    height: 22px;
-                    x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
-                }
+                icon-size: 22px;
             }
         }
         VerticalLayout {
             alignment: center;
             min-width: 150px;
             max-width: 150px;
-            Text {
-                text: AppState.now-title;
+            FadeText {
+                value: AppState.now-title;
                 color: Theme.text;
                 font-size: 13px;
                 font-weight: 500;

@@ -101,7 +101,15 @@ export global Theme {
     out property <color> danger: c.danger;
     out property <color> success: c.success;
     out property <color> success-bg: c.success-bg;
+    /// Motion. Everything is off in performance saving. Short and eased out: the interface should feel
+    /// like it answers at once. The curve used throughout is cubic-bezier(0.23, 1, 0.32, 1).
     out property <duration> fade: perf ? 0ms : 120ms;
+    /// Colour changes under the mouse
+    out property <duration> fade-hover: perf ? 0ms : 100ms;
+    /// Things that slide, like a switch knob
+    out property <duration> fade-move: perf ? 0ms : 160ms;
+    /// A new screen appearing
+    out property <duration> fade-screen: perf ? 0ms : 140ms;
 }
 
 /// The tooltip currently shown; rows and buttons fill it in, the window draws it on top of everything

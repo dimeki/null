@@ -1,5 +1,5 @@
 import { Theme, Glyphs } from "theme.slint";
-import { Icon, IconButton, Scrub, CreditLine } from "components.slint";
+import { Icon, IconButton, Scrub, CreditLine, CoverImage, FadeText } from "components.slint";
 import { AppState } from "state.slint";
 
 /// The player as a column down the left: a big cover, what is playing, the seek bar and the
@@ -10,28 +10,15 @@ export component PlayerColumn inherits Rectangle {
     VerticalLayout {
         padding: 18px;
         spacing: 0px;
-        Rectangle {
+        // the small cover shows at once, and the big one cross-fades in when it arrives
+        CoverImage {
+            source: AppState.now-cover-big.width > 0 ? AppState.now-cover-big : AppState.now-cover;
             height: 212px;
             border-radius: 12px;
-            background: Theme.accent-bg;
-            clip: true;
-            // the small cover shows at once, and the big one replaces it when it arrives
-            if AppState.now-cover.width > 0 && !Theme.perf: Image {
-                source: AppState.now-cover-big.width > 0 ? AppState.now-cover-big : AppState.now-cover;
-                width: parent.width;
-                height: parent.height;
-            }
-            if AppState.now-cover.width == 0 || Theme.perf: Icon {
-                glyph: Glyphs.music;
-                tint: Theme.accent;
-                width: 56px;
-                height: 56px;
-                x: (parent.width - self.width) / 2;
-                y: (parent.height - self.height) / 2;
-            }
+            icon-size: 56px;
         }
-        Text {
-            text: AppState.now-title;
+        FadeText {
+            value: AppState.now-title;
             color: Theme.text;
             font-size: 16px;
             font-weight: 500;

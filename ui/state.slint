@@ -6,6 +6,8 @@ export global AppState {
     // Changing this by a hair makes the whole window repaint. Windows can throw away what a
     // window last drew (after sleep or a long idle), and the app only redraws what changed.
     in-out property <int> repaint-nonce;
+    /// Set while a shortcut key moves between screens: nothing should animate then
+    in-out property <bool> skip-anim;
     /// Screens bump this to give the keyboard back to the window's shortcuts (after the search box)
     in-out property <int> keys-focus-nonce;
     in-out property <string> query;
@@ -188,6 +190,10 @@ export global AppState {
         settings-open = !settings-open;
         view-changed(settings-open ? -1 : tab);
     }
+
+    /// Something is loading (a search, a page, a playlist, lyrics): a thin line shows it
+    out property <bool> busy: searching || artist-loading || playlist-loading || library-loading || lyrics-loading;
+
     public pure function clock(secs: float) -> string {
         return "\{Math.floor(secs / 60)}:\{Math.mod(Math.floor(secs), 60) < 10 ? "0" : ""}\{Math.mod(Math.floor(secs), 60)}";
     }

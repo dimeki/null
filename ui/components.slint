@@ -1,3 +1,4 @@
+import { AppState } from "state.slint";
 import { Theme, TipState, Glyphs, TrackItem, LyricLine } from "theme.slint";
 
 export component Icon inherits Path {
@@ -59,18 +60,27 @@ export component IconButton inherits Rectangle {
     min-height: root.size;
     max-height: root.size;
     preferred-height: root.size;
-    border-radius: root.size / 2;
-    border-width: (ta.has-hover && !root.solid) ? 1px : 0px;
-    border-color: Theme.border-strong;
-    background: root.solid ? (ta.has-hover ? Theme.text.with-alpha(0.82) : Theme.text) : (ta.has-hover ? Theme.hover : transparent);
-    animate background { duration: Theme.fade; }
-    Icon {
-        glyph: root.glyph;
-        tint: root.solid ? Theme.bg : (root.on ? Theme.accent : (ta.has-hover ? Theme.text : root.tint));
-        width: root.size * 0.56;
-        height: root.size * 0.56;
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
+    // the visible button: it sinks a little while pressed, so it feels like it heard the click
+    face := Rectangle {
+        property <length> inset: ta.pressed ? root.size * 0.03 : 0px;
+        animate inset { duration: Theme.fade-hover; easing: ease-out; }
+        x: self.inset;
+        y: self.inset;
+        width: parent.width - 2 * self.inset;
+        height: parent.height - 2 * self.inset;
+        border-radius: self.height / 2;
+        border-width: (ta.has-hover && !root.solid) ? 1px : 0px;
+        border-color: Theme.border-strong;
+        background: root.solid ? (ta.has-hover ? Theme.text.with-alpha(0.82) : Theme.text) : (ta.has-hover ? Theme.hover : transparent);
+        animate background { duration: Theme.fade-hover; easing: ease; }
+        Icon {
+            glyph: root.glyph;
+            tint: root.solid ? Theme.bg : (root.on ? Theme.accent : (ta.has-hover ? Theme.text : root.tint));
+            width: root.size * 0.56;
+            height: root.size * 0.56;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+        }
     }
     btn-tip := HoverTip {
         x: parent.width / 2;
@@ -125,18 +135,27 @@ export component TextButton inherits Rectangle {
     min-width: t.preferred-width + 24px;
     max-width: t.preferred-width + 24px;
     height: 30px;
-    border-radius: 6px;
-    border-width: root.primary ? 0px : 1px;
-    border-color: ta.has-hover ? Theme.text3 : Theme.border-strong;
-    background: root.primary ? (ta.has-hover ? Theme.accent-fill.with-alpha(0.85) : Theme.accent-fill) : (ta.has-hover ? Theme.hover : transparent);
-    animate background { duration: Theme.fade; }
-    t := Text {
-        text: root.label;
-        font-size: 12px;
-        font-weight: 500;
-        color: root.primary ? #ffffff : (root.danger ? Theme.danger : Theme.text);
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    // the visible button: it sinks a little while pressed, so it feels like it heard the click
+    face := Rectangle {
+        property <length> inset: ta.pressed ? 1px : 0px;
+        animate inset { duration: Theme.fade-hover; easing: ease-out; }
+        x: self.inset;
+        y: self.inset;
+        width: parent.width - 2 * self.inset;
+        height: parent.height - 2 * self.inset;
+        border-radius: 6px;
+        border-width: root.primary ? 0px : 1px;
+        border-color: ta.has-hover ? Theme.text3 : Theme.border-strong;
+        background: root.primary ? (ta.has-hover ? Theme.accent-fill.with-alpha(0.85) : Theme.accent-fill) : (ta.has-hover ? Theme.hover : transparent);
+        animate background { duration: Theme.fade-hover; easing: ease; }
+        t := Text {
+            text: root.label;
+            font-size: 12px;
+            font-weight: 500;
+            color: root.primary ? #ffffff : (root.danger ? Theme.danger : Theme.text);
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
     ta := TouchArea {
         mouse-cursor: pointer;
@@ -246,7 +265,7 @@ export component Toggle inherits Rectangle {
     Rectangle {
         border-radius: self.height / 2;
         background: root.checked ? Theme.accent-fill : Theme.border-strong;
-        animate background { duration: Theme.fade; }
+        animate background { duration: Theme.fade-move; easing: ease; }
         // equal 3px margins at both ends
         Rectangle {
             width: 18px;
@@ -255,7 +274,7 @@ export component Toggle inherits Rectangle {
             background: #ffffff;
             y: (parent.height - self.height) / 2;
             x: root.checked ? parent.width - self.width - 3px : 3px;
-            animate x { duration: Theme.fade; }
+            animate x { duration: Theme.fade-move; easing: cubic-bezier(0.23, 1, 0.32, 1); }
         }
     }
     ta := TouchArea {
@@ -294,7 +313,7 @@ export component ScrollList inherits Rectangle {
         y: root.scrollable ? (-fl.content-y / (fl.content-height - fl.height)) * (parent.height - self.height) : 0px;
         border-radius: self.width / 2;
         background: (bar.has-hover || bar.pressed) ? Theme.text3 : Theme.border-strong;
-        animate width { duration: Theme.fade; }
+        animate width { duration: Theme.fade-hover; easing: ease-out; }
     }
     bar := TouchArea {
         x: parent.width - 14px;
@@ -338,7 +357,7 @@ export component Scrub inherits Rectangle {
         height: root.active ? 6px : 4px;
         border-radius: self.height / 2;
         background: Theme.border-strong;
-        animate height { duration: Theme.fade; }
+        animate height { duration: Theme.fade-hover; easing: ease-out; }
         Rectangle {
             x: 0px;
             y: 0px;
@@ -346,7 +365,7 @@ export component Scrub inherits Rectangle {
             width: parent.width * root.shown;
             border-radius: parent.border-radius;
             background: root.active ? Theme.accent : Theme.text2;
-            animate background { duration: Theme.fade; }
+            animate background { duration: Theme.fade-hover; easing: ease-out; }
         }
     }
     Rectangle {
@@ -481,7 +500,6 @@ export component TrackRow inherits Rectangle {
     border-radius: 8px;
     opacity: root.dragging ? 0.55 : 1;
     background: root.current ? Theme.accent-bg : (row-ta.has-hover ? Theme.hover : transparent);
-    animate background { duration: Theme.fade; }
     row-ta := TouchArea {
         mouse-cursor: pointer;
         moved => {
@@ -572,7 +590,6 @@ export component TrackRow inherits Rectangle {
                 Rectangle {
                     background: #00000099;
                     opacity: (root.playable && root.hovering) ? 1 : 0;
-                    animate opacity { duration: Theme.fade; }
                     Icon {
                         glyph: Glyphs.play;
                         tint: #ffffff;
@@ -759,7 +776,6 @@ export component NavItem inherits Rectangle {
     height: 36px;
     border-radius: 8px;
     background: root.active ? Theme.accent-bg : (nav-ta.has-hover ? Theme.hover : transparent);
-    animate background { duration: Theme.fade; }
     nav-ta := TouchArea {
         mouse-cursor: pointer;
         clicked => {
@@ -831,7 +847,6 @@ export component PillTab inherits Rectangle {
     min-width: pill-text.preferred-width + 28px;
     border-radius: 15px;
     background: root.active ? Theme.accent-bg : (pill-ta.has-hover ? Theme.hover : transparent);
-    animate background { duration: Theme.fade; }
     pill-text := Text {
         text: root.label;
         font-size: 13px;
@@ -858,7 +873,6 @@ export component SegTab inherits Rectangle {
     border-width: 1px;
     border-color: root.active ? Theme.border-strong : transparent;
     background: root.active ? Theme.surface : (seg-ta.has-hover ? Theme.hover : transparent);
-    animate background { duration: Theme.fade; }
     seg-text := Text {
         text: root.label;
         font-size: 13px;
@@ -871,6 +885,149 @@ export component SegTab inherits Rectangle {
         mouse-cursor: pointer;
         clicked => {
             root.clicked();
+        }
+    }
+}
+
+// ---- motion ----------------------------------------------------------------------------
+// These are driven by a small timer instead of `animate`, so they always start from the
+// beginning when something appears or changes. Each runs only while it is moving.
+
+/// Fades in whatever is inside it when it first appears. Instant in performance saving,
+/// and for keyboard navigation (something pressed many times a day should never feel delayed).
+export component FadeIn inherits Rectangle {
+    property <bool> instant: false;
+    property <float> t: 0;
+    property <float> p: Math.min(1.0, root.t / (Theme.fade-screen / 1s));
+    opacity: root.instant ? 1.0 : 1.0 - Math.pow(1.0 - root.p, 3);
+    init => {
+        root.instant = AppState.skip-anim || Theme.fade-screen == 0ms;
+    }
+    Timer {
+        interval: 16ms;
+        running: !root.instant && root.t < 0.3;
+        triggered => {
+            root.t += 0.016;
+        }
+    }
+    @children
+}
+
+/// A thin line along the top edge that eases across while something loads, then finishes and fades
+export component LoadingLine inherits Rectangle {
+    in property <bool> busy;
+    property <float> t: 0;
+    property <bool> done: true;
+    height: 2px;
+    visible: !Theme.perf;
+    opacity: root.done ? 0 : 1;
+    animate opacity { duration: Theme.fade; easing: ease-out; }
+    changed busy => {
+        if (root.busy) {
+            root.t = 0;
+            root.done = false;
+        } else {
+            root.done = true;
+        }
+    }
+    Rectangle {
+        x: 0px;
+        height: parent.height;
+        width: parent.width * (root.done ? 1.0 : 0.85 * (1.0 - Math.exp(-3.0 * root.t)));
+        background: Theme.accent;
+    }
+    Timer {
+        interval: 16ms;
+        running: root.busy && !Theme.perf;
+        triggered => {
+            root.t += 0.016;
+        }
+    }
+}
+
+/// A cover that cross-fades into the next one when the song changes
+export component CoverImage inherits Rectangle {
+    in property <image> source;
+    in property <length> icon-size: 22px;
+    property <image> under;
+    property <image> over;
+    property <float> t: 1;
+    property <float> p: Math.min(1.0, root.t / 0.18);
+    background: Theme.accent-bg;
+    clip: true;
+    init => {
+        root.over = root.source;
+    }
+    changed source => {
+        if (root.source.width == 0 || Theme.perf) {
+            root.under = root.source;
+            root.over = root.source;
+        } else {
+            root.under = root.over;
+            root.over = root.source;
+            root.t = 0;
+        }
+    }
+    if root.under.width > 0 && !Theme.perf: Image {
+        source: root.under;
+        width: parent.width;
+        height: parent.height;
+    }
+    if root.over.width > 0 && !Theme.perf: Image {
+        source: root.over;
+        width: parent.width;
+        height: parent.height;
+        opacity: root.under.width > 0 ? 1.0 - Math.pow(1.0 - root.p, 3) : 1.0;
+    }
+    if (root.over.width == 0 && root.under.width == 0) || Theme.perf: Icon {
+        glyph: Glyphs.music;
+        tint: Theme.accent;
+        width: root.icon-size;
+        height: root.icon-size;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    Timer {
+        interval: 16ms;
+        running: root.t < 0.2 && !Theme.perf;
+        triggered => {
+            root.t += 0.016;
+        }
+    }
+}
+
+/// Text that fades out and back in when it changes (the title of the song playing): out fast, in a little slower
+export component FadeText inherits Text {
+    in property <string> value;
+    property <string> shown;
+    property <int> phase: 0;
+    property <float> t: 0;
+    text: root.shown;
+    opacity: root.phase == 1 ? 1.0 - Math.min(1.0, root.t / 0.09) : (root.phase == 2 ? 1.0 - Math.pow(1.0 - Math.min(1.0, root.t / 0.15), 3) : 1.0);
+    init => {
+        root.shown = root.value;
+    }
+    changed value => {
+        if (Theme.perf || root.shown == "" || root.value == "") {
+            root.shown = root.value;
+            root.phase = 0;
+        } else if (root.phase != 1) {
+            root.phase = 1;
+            root.t = 0;
+        }
+    }
+    Timer {
+        interval: 16ms;
+        running: root.phase != 0;
+        triggered => {
+            root.t += 0.016;
+            if (root.phase == 1 && root.t >= 0.09) {
+                root.shown = root.value;
+                root.phase = 2;
+                root.t = 0;
+            } else if (root.phase == 2 && root.t >= 0.15) {
+                root.phase = 0;
+            }
         }
     }
 }

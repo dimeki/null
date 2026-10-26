@@ -336,12 +336,27 @@ pub fn run(out: PathBuf) -> Result<(), slint::PlatformError> {
 /// Lets animations finish, draws the window into memory and saves it
 fn snapshot(window: &Rc<MinimalSoftwareWindow>, clock: &Cell<Duration>, path: &Path) -> Result<(), String> {
     let mut pixels = vec![PremultipliedRgbaColor::default(); (WIDTH * HEIGHT) as usize];
-    for _ in 0..3 {
-        clock.set(clock.get() + Duration::from_secs(2));
+    // Animations and timers run on a clock the tool moves by hand, in 16 ms steps like a real
+    // display, so they play out the way they do in the app. By default everything is allowed to
+    // finish; GALLERY_FRAME_MS=40 takes the picture that long after the change instead, which
+    // shows an animation part-way through.
+    let frame_ms: Option<u64> = std::env::var("GALLERY_FRAME_MS").ok().and_then(|v| v.parse().ok());
+    let steps = frame_ms.map_or(40, |ms| (ms / 16).max(1));
+    for _ in 0..steps {
+        clock.set(clock.get() + Duration::from_millis(16));
         slint::platform::update_timers_and_animations();
         window.draw_if_needed(|renderer| {
             renderer.render(&mut pixels, WIDTH as usize);
         });
+    }
+    if frame_ms.is_none() {
+        for _ in 0..2 {
+            clock.set(clock.get() + Duration::from_secs(2));
+            slint::platform::update_timers_and_animations();
+            window.draw_if_needed(|renderer| {
+                renderer.render(&mut pixels, WIDTH as usize);
+            });
+        }
     }
     let mut bytes = Vec::with_capacity(pixels.len() * 4);
     for p in &pixels {

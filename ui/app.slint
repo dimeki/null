@@ -31,6 +31,15 @@ export component MainWindow inherits Window {
     default-font-size: 13px;
 
 
+    /// Clears the no-animation flag a moment after a shortcut key has moved between screens
+    Timer {
+        interval: 250ms;
+        running: AppState.skip-anim;
+        triggered => {
+            AppState.skip-anim = false;
+        }
+    }
+
     /// Screens ask for the keyboard to go back to the shortcuts below
     property <int> refocus: AppState.keys-focus-nonce;
     changed refocus => {
@@ -69,6 +78,8 @@ export component MainWindow inherits Window {
                 return accept;
             }
             if (e.text == "/" || (e.modifiers.control && e.text == "f")) {
+                // a shortcut key: no animation, it is used far too often to wait for
+                AppState.skip-anim = true;
                 AppState.settings-open = false;
                 AppState.artist-open = false;
                 AppState.close-artist();
@@ -78,6 +89,7 @@ export component MainWindow inherits Window {
                 return accept;
             }
             if (e.text == Key.Escape) {
+                AppState.skip-anim = true;
                 if (AppState.artist-open) {
                     AppState.artist-back();
                 } else if (AppState.settings-open) {

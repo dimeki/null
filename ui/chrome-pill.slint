@@ -1,5 +1,5 @@
 import { Theme, Glyphs } from "theme.slint";
-import { Icon, IconButton, Scrub, CreditLine } from "components.slint";
+import { Icon, IconButton, Scrub, CreditLine, CoverImage, FadeText } from "components.slint";
 import { AppState } from "state.slint";
 
 /// A compact player that floats over the bottom of the screens (the compact layout)
@@ -19,34 +19,21 @@ export component PlayerPill inherits Rectangle {
             spacing: 11px;
             VerticalLayout {
                 alignment: center;
-                Rectangle {
+                CoverImage {
+                    source: AppState.now-cover;
                     min-width: 42px;
                     max-width: 42px;
                     min-height: 42px;
                     max-height: 42px;
                     border-radius: 6px;
-                    background: Theme.accent-bg;
-                    clip: true;
-                    if AppState.now-cover.width > 0 && !Theme.perf: Image {
-                        source: AppState.now-cover;
-                        width: parent.width;
-                        height: parent.height;
-                    }
-                    if AppState.now-cover.width == 0 || Theme.perf: Icon {
-                        glyph: Glyphs.music;
-                        tint: Theme.accent;
-                        width: 20px;
-                        height: 20px;
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                    }
+                    icon-size: 20px;
                 }
             }
             VerticalLayout {
                 alignment: center;
                 horizontal-stretch: 1;
-                Text {
-                    text: AppState.now-title;
+                FadeText {
+                    value: AppState.now-title;
                     color: Theme.text;
                     font-size: 13px;
                     font-weight: 500;

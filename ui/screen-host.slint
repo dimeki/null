@@ -1,4 +1,5 @@
 import { AppState } from "state.slint";
+import { FadeIn, LoadingLine } from "components.slint";
 import { UpdateBanner } from "chrome-banner.slint";
 import { ScreenSettings } from "screens/settings.slint";
 import { ScreenArtist } from "screens/artist.slint";
@@ -12,16 +13,52 @@ import { ScreenQueue } from "chrome-queue.slint";
 
 /// Shows the screen the user is on (and the update notice above it). Every layout puts this
 /// where its content goes, so a new layout never has to know which screen is which.
-export component ScreenHost inherits VerticalLayout {
-    spacing: 10px;
-    if AppState.update-available && !AppState.update-dismissed: UpdateBanner { }
-    if AppState.settings-open: ScreenSettings { }
-    if AppState.artist-open && !AppState.settings-open: ScreenArtist { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 0: ScreenSearch { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 1 && !AppState.signed-in: ScreenSignIn { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 1 && AppState.signed-in && !AppState.in-playlist: ScreenLibrary { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 1 && AppState.signed-in && AppState.in-playlist: ScreenPlaylist { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 2: ScreenLyrics { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 3: ScreenParty { }
-    if !AppState.settings-open && !AppState.artist-open && AppState.tab == 4: ScreenQueue { }
+/// A new screen fades in, and a thin line along the top shows when something is loading.
+export component ScreenHost inherits Rectangle {
+    VerticalLayout {
+        spacing: 10px;
+        if AppState.update-available && !AppState.update-dismissed: UpdateBanner { }
+        if AppState.settings-open: FadeIn {
+            vertical-stretch: 1;
+            ScreenSettings { }
+        }
+        if AppState.artist-open && !AppState.settings-open: FadeIn {
+            vertical-stretch: 1;
+            ScreenArtist { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 0: FadeIn {
+            vertical-stretch: 1;
+            ScreenSearch { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 1 && !AppState.signed-in: FadeIn {
+            vertical-stretch: 1;
+            ScreenSignIn { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 1 && AppState.signed-in && !AppState.in-playlist: FadeIn {
+            vertical-stretch: 1;
+            ScreenLibrary { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 1 && AppState.signed-in && AppState.in-playlist: FadeIn {
+            vertical-stretch: 1;
+            ScreenPlaylist { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 2: FadeIn {
+            vertical-stretch: 1;
+            ScreenLyrics { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 3: FadeIn {
+            vertical-stretch: 1;
+            ScreenParty { }
+        }
+        if !AppState.settings-open && !AppState.artist-open && AppState.tab == 4: FadeIn {
+            vertical-stretch: 1;
+            ScreenQueue { }
+        }
+    }
+    LoadingLine {
+        busy: AppState.busy;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+    }
 }
