@@ -1,5 +1,5 @@
 import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "theme.slint";
-import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "components.slint";
+import { Icon, HoverTip, IconButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "components.slint";
 import { AppState } from "state.slint";
 
 /// The queue: a header with Clear, and the rows (drag to reorder, right-click for more)
@@ -87,13 +87,6 @@ export component QueueList inherits VerticalLayout {
     }
 }
 
-/// The queue as a narrow panel beside the screens (the tabs layout)
-export component QueuePanel inherits VerticalLayout {
-    padding: 14px;
-    min-width: 270px;
-    max-width: 270px;
-    QueueList { }
-}
 
 /// The queue as a screen of its own (the sidebar layout)
 export component ScreenQueue inherits VerticalLayout {

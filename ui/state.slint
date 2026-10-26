@@ -51,10 +51,6 @@ export global AppState {
     callback artist-back();
     callback close-artist();
     in-out property <image> now-cover;
-    /// A larger version of the cover, fetched only while the art-first layout is on
-    in-out property <image> now-cover-big;
-    /// The cover's average colour (fully transparent when there is no cover); layouts tint from it
-    in-out property <color> now-tint;
     in-out property <string> pos-text: "0:00";
     in-out property <string> dur-text: "0:00";
     in-out property <float> duration-secs;
@@ -171,7 +167,6 @@ export global AppState {
     callback seek-lyric(float);
 
 
-    callback set-layout(int);
     callback set-floating-player(bool);
 
     /// Go to a main screen (0 search, 1 library, 2 lyrics, 3 party, 4 queue) from wherever you are

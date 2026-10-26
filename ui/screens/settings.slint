@@ -1,5 +1,5 @@
 import { Theme, TipState, Glyphs, TrackItem, LyricLine, PartyMember } from "../theme.slint";
-import { Icon, HoverTip, IconButton, TabButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip, ChoiceChip } from "../components.slint";
+import { Icon, HoverTip, IconButton, TextButton, TextField, Card, TextLink, Toggle, ScrollList, Scrub, CreditLine, TrackRow, LyricRow, ThemeChip } from "../components.slint";
 import { AppState } from "../state.slint";
 
 export component ScreenSettings inherits Rectangle {
@@ -150,46 +150,6 @@ export component ScreenSettings inherits Rectangle {
         }
     }
     Rectangle {
-        height: 64px;
-        border-radius: 8px;
-        background: lay-ta.has-hover ? Theme.hover : transparent;
-        lay-ta := TouchArea { }
-        HorizontalLayout {
-            padding-left: 10px;
-            padding-right: 10px;
-            spacing: 12px;
-            VerticalLayout {
-                alignment: center;
-                horizontal-stretch: 1;
-                Text {
-                    text: "Layout";
-                    font-size: 13px;
-                    font-weight: 500;
-                    color: Theme.text;
-                }
-                Text {
-                    text: "How the app is arranged";
-                    font-size: 12px;
-                    color: Theme.text2;
-                }
-            }
-            VerticalLayout {
-                alignment: center;
-                HorizontalLayout {
-                    spacing: 8px;
-                    for name[i] in Theme.layout-names: ChoiceChip {
-                        label: name;
-                        selected: Theme.layout == i;
-                        picked => {
-                            Theme.layout = i;
-                            AppState.set-layout(i);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if Theme.layout == 1: Rectangle {
         height: 64px;
         border-radius: 8px;
         background: fp-ta.has-hover ? Theme.hover : transparent;

@@ -63,8 +63,6 @@ pub enum Cmd {
     CycleRepeat,
     Fetched { id: String, result: Result<PathBuf, String> },
     Thumb { id: String, rgba: Option<Vec<u8>> },
-    /// The large cover for the song playing (art-first layout)
-    BigThumb { id: String, rgba: Option<Vec<u8>> },
     /// The mouse is resting on a row: start getting its audio so a click plays sooner
     PrefetchResult(usize),
     PrefetchPlaylistTrack(usize),
@@ -125,9 +123,7 @@ pub enum Cmd {
     SetAutoUpdate(bool),
     /// The user picked a colour theme (0 follows Windows)
     SetTheme(i32),
-    /// The user picked a layout (0 tabs, 1 sidebar, 2 art first)
-    SetLayout(i32),
-    /// The user switched the floating player on or off (sidebar layout)
+    /// The user switched the floating player on or off
     SetFloatingPlayer(bool),
 }
 
@@ -268,9 +264,6 @@ struct Engine {
     thumbs: Thumbs,
     thumb_pending: HashSet<String>,
     thumb_tx: Sender<(String, String)>,
-    big_tx: Sender<(String, String)>,
-    /// Song whose big cover is shown or being fetched
-    big_for: Option<String>,
     trim_at: Option<Instant>,
     client: Client,
     cookie_path: PathBuf,
@@ -322,9 +315,7 @@ struct Engine {
     auto_update: bool,
     /// Colour theme: 0 follows Windows, then the palettes in ui/theme.slint
     theme: i32,
-    /// Layout: 0 tabs along the top, 1 a sidebar, 2 art first
-    layout: i32,
-    /// Sidebar layout only: the player floats as a pill
+    /// The player floats as a pill over the screens instead of sitting in a bar
     floating_player: bool,
     /// When the next automatic check is due (none while automatic checks are off)
     next_update_check: Option<Instant>,
@@ -360,7 +351,6 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
     let thumb_dir = cache_dir.with_file_name("thumbs");
     crate::ytdlp::prune_cache(&thumb_dir, 50 * 1024 * 1024);
     let thumb_tx = crate::thumbs::spawn(tx.clone(), thumb_dir);
-    let big_tx = crate::thumbs::spawn_big(tx.clone());
     let mut eng = Engine {
         mpv,
         ytdlp: YtDlp::new(&vendor.join("yt-dlp.exe")),
@@ -382,8 +372,6 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
         thumbs: HashMap::new(),
         thumb_pending: HashSet::new(),
         thumb_tx,
-        big_tx,
-        big_for: None,
         trim_at: Some(Instant::now() + Duration::from_secs(5)),
         client: Client::new(None),
         cookie_path,
@@ -421,7 +409,6 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
         update_note: String::new(),
         auto_update: true,
         theme: 0,
-        layout: 0,
         floating_player: false,
         next_update_check: None,
     };
@@ -490,47 +477,6 @@ impl Engine {
     fn handle(&mut self, cmd: Cmd) {
         self.handle_cmd(cmd);
         self.refresh_thumbs();
-        self.refresh_big_cover();
-    }
-
-    /// The art-first layout shows the current song's cover large. Fetch a bigger one for it,
-    /// and let it go again when that layout is not in use (or covers are off).
-    fn refresh_big_cover(&mut self) {
-        let want = if self.layout == 2 && !self.perf {
-            self.cur.and_then(|c| self.queue.get(c)).map(|t| (t.id.clone(), t.thumb.clone()))
-        } else {
-            None
-        };
-        match want {
-            None => {
-                if self.big_for.take().is_some() {
-                    let _ = self.ui.upgrade_in_event_loop(|ui| ui.global::<AppState>().set_now_cover_big(Image::default()));
-                }
-            }
-            Some((id, thumb)) => {
-                if self.big_for.as_deref() != Some(id.as_str()) {
-                    let url = crate::thumbs::big_url(&thumb, &id);
-                    self.big_for = Some(id.clone());
-                    let _ = self.ui.upgrade_in_event_loop(|ui| ui.global::<AppState>().set_now_cover_big(Image::default()));
-                    let _ = self.big_tx.send((id, url));
-                }
-            }
-        }
-    }
-
-    fn big_thumb_arrived(&mut self, id: String, rgba: Option<Vec<u8>>) {
-        // the song may have changed while it loaded
-        if self.big_for.as_deref() != Some(id.as_str()) {
-            return;
-        }
-        let Some(rgba) = rgba else { return };
-        let _ = self.ui.upgrade_in_event_loop(move |ui| {
-            let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(crate::thumbs::BIG, crate::thumbs::BIG);
-            if rgba.len() == buf.as_bytes().len() {
-                buf.make_mut_bytes().copy_from_slice(&rgba);
-                ui.global::<AppState>().set_now_cover_big(Image::from_rgba8(buf));
-            }
-        });
     }
 
     /// Drops covers nobody is showing any more and asks for the ones that are missing
@@ -596,7 +542,6 @@ impl Engine {
             let img = cover(&rgba);
             if current_id.as_deref() == Some(id.as_str()) {
                 ui.global::<AppState>().set_now_cover(img.clone());
-                ui.global::<AppState>().set_now_tint(average_color(&rgba));
             }
             if header_id.as_deref() == Some(id.as_str()) {
                 ui.global::<AppState>().set_artist_image(img.clone());
@@ -672,10 +617,6 @@ impl Engine {
             }
             Cmd::SetFloatingPlayer(on) => {
                 self.floating_player = on;
-                self.dirty.set(true);
-            }
-            Cmd::SetLayout(layout) => {
-                self.layout = layout.clamp(0, 3);
                 self.dirty.set(true);
             }
             Cmd::SetTheme(theme) => {
@@ -911,7 +852,6 @@ impl Engine {
                 }
             }
             Cmd::Thumb { id, rgba } => self.thumb_arrived(id, rgba),
-            Cmd::BigThumb { id, rgba } => self.big_thumb_arrived(id, rgba),
         }
     }
 
@@ -2133,12 +2073,10 @@ impl Engine {
         self.auto_update = saved.auto_update_check;
         self.theme = saved.theme;
         let theme = saved.theme;
-        self.layout = saved.layout;
         self.floating_player = saved.floating_player;
-        let (layout, floating) = (saved.layout, saved.floating_player);
+        let floating = saved.floating_player;
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             ui.global::<Theme>().set_palette(theme);
-            ui.global::<Theme>().set_layout(layout);
             ui.global::<Theme>().set_floating_player(floating);
         });
         if !saved.display_name.is_empty() {
@@ -2187,7 +2125,6 @@ impl Engine {
             display_name: self.display_name.clone(),
             auto_update_check: self.auto_update,
             theme: self.theme,
-            layout: self.layout,
             floating_player: self.floating_player,
         };
         let _ = crate::state::save(&self.state_path, &saved);
@@ -2257,7 +2194,6 @@ impl Engine {
         };
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             ui.global::<AppState>().set_queue(items(&queue, &thumbs));
-            ui.global::<AppState>().set_now_tint(now_cover.as_ref().map_or(slint::Color::from_argb_u8(0, 0, 0, 0), |b| average_color(b)));
             ui.global::<AppState>().set_now_cover(now_cover.map(|b| cover(&b)).unwrap_or_default());
             ui.global::<AppState>().set_current_index(cur);
             ui.global::<AppState>().set_now_title(title.into());
@@ -2336,22 +2272,6 @@ fn credit(channel: &str) -> (String, String) {
     }
 }
 
-/// The average colour of a cover (RGBA pixels). The layouts that tint their background from the
-/// cover use it, softened, behind everything.
-fn average_color(rgba: &[u8]) -> slint::Color {
-    let (mut r, mut g, mut b, mut n) = (0u64, 0u64, 0u64, 0u64);
-    for px in rgba.chunks_exact(4) {
-        r += px[0] as u64;
-        g += px[1] as u64;
-        b += px[2] as u64;
-        n += 1;
-    }
-    if n == 0 {
-        return slint::Color::from_argb_u8(0, 0, 0, 0);
-    }
-    slint::Color::from_rgb_u8((r / n) as u8, (g / n) as u8, (b / n) as u8)
-}
-
 fn cover(rgba: &[u8]) -> Image {
     let mut buf = SharedPixelBuffer::<Rgba8Pixel>::new(crate::thumbs::SIZE, crate::thumbs::SIZE);
     buf.make_mut_bytes().copy_from_slice(rgba);
@@ -2362,15 +2282,6 @@ fn cover(rgba: &[u8]) -> Image {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_covers_average_colour_is_its_mean() {
-        // two pixels, red and blue, make purple; transparency is ignored
-        let c = average_color(&[200, 0, 0, 255, 0, 0, 100, 255]);
-        assert_eq!((c.red(), c.green(), c.blue()), (100, 0, 50));
-        assert_eq!(average_color(&[]).alpha(), 0, "no cover, no tint");
-    }
-
-    #[test]
     fn moving_a_queue_row_keeps_the_playing_song_selected() {
         let run = |from, to, cur| {
             let mut q = vec!['a', 'b', 'c', 'd', 'e'];

@@ -155,8 +155,6 @@ fn base(ui: &MainWindow) {
     ui.global::<AppState>().set_now_rest("Album name".into());
     ui.global::<AppState>().set_now_artist_id(ARTIST.into());
     ui.global::<AppState>().set_now_cover(covers()[0].clone());
-    ui.global::<AppState>().set_now_cover_big(cover_sized(crate::thumbs::BIG, [70, 110, 190], [25, 40, 90]));
-    ui.global::<AppState>().set_now_tint(slint::Color::from_rgb_u8(47, 75, 140));
     ui.global::<AppState>().set_active(true);
     ui.global::<AppState>().set_paused(false);
     ui.global::<AppState>().set_loading(false);
@@ -291,8 +289,6 @@ fn scenes() -> Vec<Scene> {
             ui.global::<AppState>().set_now_rest("".into());
             ui.global::<AppState>().set_now_artist_id("".into());
             ui.global::<AppState>().set_now_cover(Image::default());
-            ui.global::<AppState>().set_now_cover_big(Image::default());
-            ui.global::<AppState>().set_now_tint(slint::Color::from_argb_u8(0, 0, 0, 0));
             ui.global::<AppState>().set_active(false);
             ui.global::<AppState>().set_pos_text("0:00".into());
             ui.global::<AppState>().set_dur_text("0:00".into());
@@ -316,21 +312,16 @@ pub fn run(out: PathBuf) -> Result<(), slint::PlatformError> {
 
     // (section heading, caption, file name)
     let mut shots: Vec<(String, String, String)> = Vec::new();
-    for (layout, floating, layout_name) in [(0, false, "tabs"), (1, false, "sidebar"), (1, true, "sidebar-pill"), (2, false, "art"), (3, false, "compact")] {
-        ui.global::<Theme>().set_layout(layout);
+    for (floating, layout_name) in [(false, "sidebar"), (true, "sidebar-pill")] {
         ui.global::<Theme>().set_floating_player(floating);
         for (palette, scheme_name) in [(1, "dark"), (2, "light"), (3, "slate"), (4, "ember"), (5, "paper"), (6, "black")] {
             ui.global::<Theme>().set_palette(palette);
             for (n, (name, setup)) in scenes().iter().enumerate() {
-                // the queue is a screen of its own only in the sidebar layout
-                if *name == "queue" && layout == 0 {
-                    continue;
-                }
                 base(&ui);
                 setup(&ui);
                 let file = format!("{layout_name}-{scheme_name}-{:02}-{name}.png", n + 1);
                 snapshot(&window, &clock, &out.join(&file)).map_err(fail)?;
-                shots.push((format!("{layout_name} layout, {scheme_name}"), (*name).to_string(), file));
+                shots.push((format!("{layout_name}, {scheme_name}"), (*name).to_string(), file));
             }
         }
     }

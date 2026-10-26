@@ -143,10 +143,6 @@ fn main() -> Result<(), slint::PlatformError> {
         let _ = t.send(Cmd::SetFloatingPlayer(on));
     });
     let t = tx.clone();
-    ui.global::<AppState>().on_set_layout(move |i| {
-        let _ = t.send(Cmd::SetLayout(i));
-    });
-    let t = tx.clone();
     ui.global::<AppState>().on_set_theme(move |i| {
         let _ = t.send(Cmd::SetTheme(i));
     });

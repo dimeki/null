@@ -52,10 +52,7 @@ export global Theme {
     /// 0 follows Windows (Dark or Light), then 1 to 6 are the entries of `palettes`, in order
     in-out property <int> palette: 0;
     out property <[string]> names: ["Windows", "Dark", "Light", "Slate", "Ember", "Paper", "Black"];
-    /// 0 is tabs along the top, 1 a sidebar, 2 the cover and player in a left column, 3 compact with a floating player
-    in-out property <int> layout: 0;
-    out property <[string]> layout-names: ["Tabs", "Sidebar", "Art first", "Compact"];
-    /// In the sidebar layout: show the player as a floating pill instead of a bar
+    /// Show the player as a small pill floating over the screens instead of a bar along the bottom
     in-out property <bool> floating-player: false;
     property <int> p: palette == 0 ? (Palette.color-scheme == ColorScheme.dark ? 1 : 2) : palette;
     out property <[Colors]> palettes: [
