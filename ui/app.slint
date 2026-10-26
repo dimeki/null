@@ -531,13 +531,56 @@ component TrackRow inherits Rectangle {
     property <bool> intent-sent;
     property <bool> hovering: row-ta.has-hover;
     property <bool> liked: root.item.id == "LM";
+    /// Rows that can be dragged to another position (the queue)
+    in property <bool> draggable: false;
+    /// An insertion line along the top or bottom edge, shown on the row a drag would drop at
+    in property <bool> line-top: false;
+    in property <bool> line-bottom: false;
+    /// How far the pointer has moved since the press, while this row is being dragged
+    callback drag-update(length);
+    callback drag-finish();
+    property <bool> dragging;
+    property <bool> was-dragged;
+    /// Right-click menu entries. `menu` is off for rows that are not songs (playlists, albums).
+    in property <bool> menu: false;
+    in property <bool> menu-add: false;
+    in property <bool> menu-remove: false;
+    callback menu-play-next();
+    callback menu-add-clicked();
+    callback menu-remove-clicked();
+    callback menu-copy-link(string);
+    callback menu-open-web(string);
     height: 48px;
     border-radius: 8px;
+    opacity: root.dragging ? 0.55 : 1;
     background: root.current ? Theme.accent-bg : (row-ta.has-hover ? Theme.hover : transparent);
     animate background { duration: Theme.fade; }
     row-ta := TouchArea {
         mouse-cursor: pointer;
+        moved => {
+            if (root.draggable && self.pressed) {
+                // a few pixels of wobble during a click is not a drag
+                if (root.dragging || Math.abs(self.mouse-y - self.pressed-y) > 6px) {
+                    root.dragging = true;
+                    root.drag-update(self.mouse-y - self.pressed-y);
+                }
+            }
+        }
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down) {
+                root.was-dragged = false;
+            }
+            if (e.kind == PointerEventKind.up && root.dragging) {
+                root.dragging = false;
+                root.was-dragged = true;
+                root.drag-finish();
+            }
+        }
         clicked => {
+            if (root.was-dragged) {
+                root.was-dragged = false;
+                return;
+            }
             TipState.shown = false;
             row-tip.fired = true;
             root.activated();
@@ -653,6 +696,62 @@ component TrackRow inherits Rectangle {
             }
         }
     }
+    if root.menu: ContextMenuArea {
+        Menu {
+            MenuItem {
+                title: "Play next";
+                activated => {
+                    root.menu-play-next();
+                }
+            }
+            MenuItem {
+                title: "Add to queue";
+                enabled: root.menu-add;
+                activated => {
+                    root.menu-add-clicked();
+                }
+            }
+            MenuItem {
+                title: "Remove from queue";
+                enabled: root.menu-remove;
+                activated => {
+                    root.menu-remove-clicked();
+                }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: "Go to artist";
+                enabled: root.item.artist-id != "";
+                activated => {
+                    root.artist-clicked(root.item.artist-id);
+                }
+            }
+            MenuItem {
+                title: "Copy link";
+                activated => {
+                    root.menu-copy-link("https://music.youtube.com/watch?v=" + root.item.id);
+                }
+            }
+            MenuItem {
+                title: "Open on YouTube Music";
+                activated => {
+                    root.menu-open-web(root.item.id);
+                }
+            }
+        }
+    }
+    if root.line-top: Rectangle {
+        y: -1px;
+        height: 2px;
+        width: parent.width;
+        background: Theme.accent;
+    }
+    if root.line-bottom: Rectangle {
+        y: parent.height - 1px;
+        height: 2px;
+        width: parent.width;
+        background: Theme.accent;
+    }
 }
 
 component LyricRow inherits Rectangle {
@@ -727,6 +826,17 @@ export component MainWindow inherits Window {
     in property <string> artist-sub;
     in property <image> artist-image;
     in property <[TrackItem]> artist-albums;
+    callback move-queue(int, int);
+    callback seek-by(float);
+    /// Set by the "/" shortcut: the search box takes the keyboard as soon as it is on screen
+    property <bool> want-search-focus;
+    callback play-next-result(int);
+    callback play-next-playlist-track(int);
+    callback play-next-queue(int);
+    callback open-track-web(string);
+    /// Queue row being dragged, and the row it would land on (-1 when no drag)
+    property <int> drag-from: -1;
+    property <int> drag-to: -1;
     callback open-artist(string);
     callback open-album(int);
     callback artist-back();
@@ -851,6 +961,58 @@ export component MainWindow inherits Window {
         return "\{Math.floor(secs / 60)}:\{Math.mod(Math.floor(secs), 60) < 10 ? "0" : ""}\{Math.mod(Math.floor(secs), 60)}";
     }
 
+    fs := FocusScope {
+        init => {
+            self.focus();
+        }
+        key-pressed(e) => {
+            // typing in the search box is handled by the box itself, so these only fire elsewhere
+            if (e.text == " ") {
+                root.toggle-pause();
+                return accept;
+            }
+            if (e.text == Key.LeftArrow) {
+                if (e.modifiers.control) {
+                    root.prev();
+                } else {
+                    root.seek-by(-5.0);
+                }
+                return accept;
+            }
+            if (e.text == Key.RightArrow) {
+                if (e.modifiers.control) {
+                    root.next();
+                } else {
+                    root.seek-by(5.0);
+                }
+                return accept;
+            }
+            if (e.text == Key.UpArrow || e.text == Key.DownArrow) {
+                root.volume = Math.max(0.0, Math.min(1.0, root.volume + (e.text == Key.UpArrow ? 0.05 : -0.05)));
+                root.set-volume(root.volume);
+                return accept;
+            }
+            if (e.text == "/" || (e.modifiers.control && e.text == "f")) {
+                root.settings-open = false;
+                root.artist-open = false;
+                root.close-artist();
+                root.tab = 0;
+                root.view-changed(0);
+                root.want-search-focus = true;
+                return accept;
+            }
+            if (e.text == Key.Escape) {
+                if (root.artist-open) {
+                    root.artist-back();
+                } else if (root.settings-open) {
+                    root.settings-open = false;
+                    root.view-changed(root.tab);
+                }
+                fs.focus();
+                return accept;
+            }
+            return reject;
+        }
     VerticalLayout {
         HorizontalLayout {
             VerticalLayout {
@@ -1335,6 +1497,20 @@ export component MainWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 for item[i] in root.playlist-tracks: TrackRow {
+                                    menu: true;
+                                    menu-add: true;
+                                    menu-play-next => {
+                                        root.play-next-playlist-track(i);
+                                    }
+                                    menu-add-clicked => {
+                                        root.add-playlist-track(i);
+                                    }
+                                    menu-copy-link(url) => {
+                                        root.copy-text(url);
+                                    }
+                                    menu-open-web(id) => {
+                                        root.open-track-web(id);
+                                    }
                                     item: item;
                                     action-glyph: Glyphs.plus;
                                     action-tip: "Add to queue";
@@ -1416,6 +1592,18 @@ export component MainWindow inherits Window {
                             color: Theme.text;
                             accepted => {
                                 root.search(root.query);
+                                // hand the keyboard back, so Space and the arrows work on the results
+                                fs.focus();
+                            }
+                        }
+                        Timer {
+                            interval: 60ms;
+                            running: root.want-search-focus;
+                            triggered => {
+                                root.want-search-focus = false;
+                                input.focus();
+                                // so the next thing typed replaces the old search
+                                input.select-all();
                             }
                         }
                     }
@@ -1426,6 +1614,20 @@ export component MainWindow inherits Window {
                                 spacing: 2px;
                                 alignment: start;
                                 for item[i] in root.results: TrackRow {
+                                    menu: true;
+                                    menu-add: true;
+                                    menu-play-next => {
+                                        root.play-next-result(i);
+                                    }
+                                    menu-add-clicked => {
+                                        root.add-result(i);
+                                    }
+                                    menu-copy-link(url) => {
+                                        root.copy-text(url);
+                                    }
+                                    menu-open-web(id) => {
+                                        root.open-track-web(id);
+                                    }
                                     artist-clicked(id) => {
                                         root.open-artist(id);
                                     }
@@ -1634,6 +1836,20 @@ export component MainWindow inherits Window {
                                 spacing: 2px;
                                 alignment: start;
                                 for item[i] in root.playlist-tracks: TrackRow {
+                                    menu: true;
+                                    menu-add: true;
+                                    menu-play-next => {
+                                        root.play-next-playlist-track(i);
+                                    }
+                                    menu-add-clicked => {
+                                        root.add-playlist-track(i);
+                                    }
+                                    menu-copy-link(url) => {
+                                        root.copy-text(url);
+                                    }
+                                    menu-open-web(id) => {
+                                        root.open-track-web(id);
+                                    }
                                     artist-clicked(id) => {
                                         root.open-artist(id);
                                     }
@@ -2034,11 +2250,40 @@ export component MainWindow inherits Window {
                             spacing: 2px;
                             alignment: start;
                             for item[i] in root.queue: TrackRow {
+                                menu: true;
+                                menu-remove: true;
+                                menu-play-next => {
+                                    root.play-next-queue(i);
+                                }
+                                menu-remove-clicked => {
+                                    root.remove-queue(i);
+                                }
+                                menu-copy-link(url) => {
+                                    root.copy-text(url);
+                                }
+                                menu-open-web(id) => {
+                                    root.open-track-web(id);
+                                }
                                 artist-clicked(id) => {
                                     root.open-artist(id);
                                 }
                                 item: item;
                                 current: i == root.current-index;
+                                draggable: !root.controls-locked;
+                                line-top: root.drag-to == i && root.drag-to < root.drag-from;
+                                line-bottom: root.drag-to == i && root.drag-to > root.drag-from;
+                                drag-update(dy) => {
+                                    root.drag-from = i;
+                                    // rows are 48px tall with 2px between them
+                                    root.drag-to = Math.max(0, Math.min(root.queue.length - 1, i + Math.round(dy / 50px)));
+                                }
+                                drag-finish => {
+                                    if (root.drag-from >= 0 && root.drag-to != root.drag-from) {
+                                        root.move-queue(root.drag-from, root.drag-to);
+                                    }
+                                    root.drag-from = -1;
+                                    root.drag-to = -1;
+                                }
                                 action-glyph: Glyphs.close;
                                 action-tip: "Remove";
                                 hover-intent => {
@@ -2143,7 +2388,7 @@ export component MainWindow inherits Window {
                         }
                         IconButton {
                             glyph: Glyphs.prev;
-                            tip: "Previous";
+                            tip: "Previous (Ctrl+Left)";
                             enabled: !root.controls-locked;
                             clicked => {
                                 root.prev();
@@ -2153,7 +2398,7 @@ export component MainWindow inherits Window {
                             glyph: (root.active && !root.paused) ? Glyphs.pause : Glyphs.play;
                             size: 44px;
                             solid: true;
-                            tip: (root.active && !root.paused) ? "Pause" : "Play";
+                            tip: (root.active && !root.paused) ? "Pause (Space)" : "Play (Space)";
                             enabled: !root.controls-locked;
                             clicked => {
                                 root.toggle-pause();
@@ -2161,7 +2406,7 @@ export component MainWindow inherits Window {
                         }
                         IconButton {
                             glyph: Glyphs.next;
-                            tip: "Next";
+                            tip: "Next (Ctrl+Right)";
                             enabled: !root.controls-locked;
                             clicked => {
                                 root.next();
@@ -2272,5 +2517,6 @@ export component MainWindow inherits Window {
             y: 5px;
             width: parent.width - 16px;
         }
+    }
     }
 }

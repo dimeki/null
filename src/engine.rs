@@ -44,6 +44,15 @@ pub enum Cmd {
     AddResult(usize),
     PlayQueue(usize),
     RemoveQueue(usize),
+    /// Drag a queue row from one position to another
+    MoveQueue { from: usize, to: usize },
+    /// Right-click menu: queue this song right after the current one
+    PlayNextResult(usize),
+    PlayNextPlaylistTrack(usize),
+    /// Right-click menu on a queue row: move it to right after the current one
+    PlayNextQueue(usize),
+    /// Right-click menu: open the song's page on YouTube Music in the browser
+    OpenTrackWeb(String),
     ClearQueue,
     TogglePause,
     Next,
@@ -64,6 +73,8 @@ pub enum Cmd {
     PausePlayback,
     Stop,
     SeekSecs(f64),
+    /// Keyboard seek: this many seconds forward (or back, when negative)
+    SeekBy(f64),
     /// The window was shown (true) or hidden to the tray (false)
     Visible(bool),
     Quit,
@@ -159,6 +170,10 @@ fn is_playback_control(cmd: &Cmd) -> bool {
             | Cmd::AddAll
             | Cmd::PlayQueue(_)
             | Cmd::RemoveQueue(_)
+            | Cmd::MoveQueue { .. }
+            | Cmd::PlayNextResult(_)
+            | Cmd::PlayNextPlaylistTrack(_)
+            | Cmd::PlayNextQueue(_)
             | Cmd::ClearQueue
             | Cmd::TogglePause
             | Cmd::Resume
@@ -168,9 +183,32 @@ fn is_playback_control(cmd: &Cmd) -> bool {
             | Cmd::Prev
             | Cmd::SeekFraction(_)
             | Cmd::SeekSecs(_)
+            | Cmd::SeekBy(_)
             | Cmd::ToggleShuffle
             | Cmd::CycleRepeat
     )
+}
+
+/// Moves the item at `from` so it ends up at `to`, keeping `cur` on the same song.
+/// Returns false when nothing changed.
+fn move_in_queue<T>(queue: &mut Vec<T>, cur: &mut Option<usize>, from: usize, to: usize) -> bool {
+    if from >= queue.len() || to >= queue.len() || from == to {
+        return false;
+    }
+    let item = queue.remove(from);
+    queue.insert(to, item);
+    *cur = cur.map(|c| {
+        if c == from {
+            to
+        } else if from < c && to >= c {
+            c - 1
+        } else if from > c && to <= c {
+            c + 1
+        } else {
+            c
+        }
+    });
+    true
 }
 
 /// "myrelay.example.dev" and "https://..." both become a websocket address
@@ -672,6 +710,39 @@ impl Engine {
             }
             Cmd::PlayQueue(i) => self.play_index(i),
             Cmd::RemoveQueue(i) => self.remove_queue(i),
+            Cmd::MoveQueue { from, to } => {
+                if move_in_queue(&mut self.queue, &mut self.cur, from, to) {
+                    self.sync();
+                    self.prefetch_next();
+                }
+            }
+            Cmd::PlayNextResult(i) => {
+                if let Some(track) = self.results.get(i).cloned() {
+                    self.queue_next(track);
+                }
+            }
+            Cmd::PlayNextPlaylistTrack(i) => {
+                if let Some(track) = self.playlist_tracks.get(i).cloned() {
+                    self.queue_next(track);
+                }
+            }
+            Cmd::PlayNextQueue(i) => {
+                if let Some(c) = self.cur.filter(|&c| c != i) {
+                    // moving a row from above the current one lands one place earlier
+                    let last = self.queue.len().saturating_sub(1);
+                    let to = if i < c { c } else { c + 1 };
+                    if move_in_queue(&mut self.queue, &mut self.cur, i, to.min(last)) {
+                        self.sync();
+                        self.prefetch_next();
+                    }
+                }
+            }
+            Cmd::OpenTrackWeb(id) => {
+                // ids come from YouTube and go into a URL, so only plain video ids are opened
+                if id.len() >= 6 && id.len() <= 20 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+                    let _ = webbrowser::open(&format!("https://music.youtube.com/watch?v={id}"));
+                }
+            }
             Cmd::ClearQueue => {
                 self.queue.clear();
                 self.stop();
@@ -709,6 +780,14 @@ impl Engine {
             Cmd::SeekSecs(secs) => {
                 if self.playing {
                     self.seek_to(secs);
+                }
+            }
+            Cmd::SeekBy(delta) => {
+                if self.playing {
+                    let pos = self.mpv.property_f64("time-pos").unwrap_or(0.0);
+                    let end = self.mpv.property_f64("duration").unwrap_or(f64::MAX);
+                    // stop just short of the end so a long press of → doesn't skip the song by accident
+                    self.seek_to((pos + delta).clamp(0.0, (end - 1.0).max(0.0)));
                 }
             }
             Cmd::SetVolume(v) => self.set_volume(v),
@@ -753,6 +832,19 @@ impl Engine {
                 }
             }
             Cmd::Thumb { id, rgba } => self.thumb_arrived(id, rgba),
+        }
+    }
+
+    /// Queues `track` to play right after the current one, without interrupting it
+    fn queue_next(&mut self, track: Track) {
+        match self.cur {
+            Some(c) => {
+                self.queue.insert((c + 1).min(self.queue.len()), track);
+                self.sync();
+                self.prefetch_next();
+            }
+            // nothing is playing, so "next" is "now"
+            None => self.enqueue(vec![track]),
         }
     }
 
@@ -1172,6 +1264,7 @@ impl Engine {
             Cmd::Prev => act(ActKind::Prev, None, None),
             Cmd::SeekFraction(f) => act(ActKind::Seek, Some(f.clamp(0.0, 1.0) as f64 * current?.duration as f64), None),
             Cmd::SeekSecs(s) => act(ActKind::Seek, Some(*s), None),
+            Cmd::SeekBy(d) => act(ActKind::Seek, Some((self.mpv.property_f64("time-pos").unwrap_or(0.0) + d).max(0.0)), None),
             // a guest has no queue of their own, so "play this" can only mean "add this"
             Cmd::PlayResult(i) | Cmd::AddResult(i) => act(ActKind::Add, None, Some(self.results.get(*i)?)),
             Cmd::PlayPlaylistTrack(i) | Cmd::AddPlaylistTrack(i) => act(ActKind::Add, None, Some(self.playlist_tracks.get(*i)?)),
@@ -2158,6 +2251,28 @@ fn cover(rgba: &[u8]) -> Image {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn moving_a_queue_row_keeps_the_playing_song_selected() {
+        let run = |from, to, cur| {
+            let mut q = vec!['a', 'b', 'c', 'd', 'e'];
+            let mut c = Some(cur);
+            assert!(move_in_queue(&mut q, &mut c, from, to));
+            (q.iter().collect::<String>(), q[c.unwrap()])
+        };
+        // the playing song is 'c' (index 2) in the first four; 'b' is playing in the last two
+        assert_eq!(run(2, 0, 2), ("cabde".to_string(), 'c'), "moving the playing song itself");
+        assert_eq!(run(0, 4, 2), ("bcdea".to_string(), 'c'), "from above to below it");
+        assert_eq!(run(4, 0, 2), ("eabcd".to_string(), 'c'), "from below to above it");
+        assert_eq!(run(3, 4, 2), ("abced".to_string(), 'c'), "both below it");
+        assert_eq!(run(1, 3, 1), ("acdbe".to_string(), 'b'));
+        let mut q = vec![1, 2, 3];
+        let mut c = None;
+        assert!(!move_in_queue(&mut q, &mut c, 1, 1), "same place");
+        assert!(!move_in_queue(&mut q, &mut c, 0, 3), "past the end");
+        assert!(!move_in_queue(&mut q, &mut c, 5, 0), "from nowhere");
+        assert!(move_in_queue(&mut q, &mut c, 0, 2) && c.is_none() && q == [2, 3, 1]);
+    }
 
     #[test]
     fn server_addresses_are_made_into_websocket_urls() {

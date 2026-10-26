@@ -46,9 +46,47 @@ fn cache_dir() -> PathBuf {
         .join("cache")
 }
 
+/// Where the window size and the open tab are kept between runs
+fn window_file() -> PathBuf {
+    cache_dir().with_file_name("window.txt")
+}
+
+/// "996 659 1" -> width, height, tab. Sizes outside what a window can sensibly be are ignored,
+/// so a damaged file never opens a window that is tiny or off the screen.
+fn parse_window(text: &str) -> Option<(u32, u32, i32)> {
+    let mut parts = text.split_whitespace();
+    let w: u32 = parts.next()?.parse().ok()?;
+    let h: u32 = parts.next()?.parse().ok()?;
+    let tab: i32 = parts.next().and_then(|t| t.parse().ok()).unwrap_or(0);
+    ((600..=7680).contains(&w) && (400..=4320).contains(&h)).then_some((w, h, tab.clamp(0, 3)))
+}
+
+fn save_window(ui: &MainWindow) {
+    let size = ui.window().size();
+    // a minimized window reports no size; keep what was saved
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+    let _ = std::fs::write(window_file(), format!("{} {} {}\n", size.width, size.height, ui.get_tab()));
+}
+
 fn main() -> Result<(), slint::PlatformError> {
     let ui = MainWindow::new()?;
     let (tx, rx) = mpsc::channel::<Cmd>();
+
+    if let Some((w, h, tab)) = std::fs::read_to_string(window_file()).ok().and_then(|t| parse_window(&t)) {
+        ui.window().set_size(slint::PhysicalSize::new(w, h));
+        ui.set_tab(tab);
+        match tab {
+            1 => {
+                let _ = tx.send(Cmd::OpenLibrary);
+            }
+            2 => {
+                let _ = tx.send(Cmd::ViewChanged(2));
+            }
+            _ => {}
+        }
+    }
 
     let t = tx.clone();
     ui.on_search(move |q| {
@@ -89,6 +127,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let t = tx.clone();
     ui.on_seek(move |f| {
         let _ = t.send(Cmd::SeekFraction(f));
+    });
+    let t = tx.clone();
+    ui.on_seek_by(move |secs| {
+        let _ = t.send(Cmd::SeekBy(secs as f64));
     });
     let t = tx.clone();
     ui.on_set_volume(move |v| {
@@ -134,6 +176,26 @@ fn main() -> Result<(), slint::PlatformError> {
     let t = tx.clone();
     ui.on_set_auto_update(move |on| {
         let _ = t.send(Cmd::SetAutoUpdate(on));
+    });
+    let t = tx.clone();
+    ui.on_move_queue(move |from, to| {
+        let _ = t.send(Cmd::MoveQueue { from: from.max(0) as usize, to: to.max(0) as usize });
+    });
+    let t = tx.clone();
+    ui.on_play_next_result(move |i| {
+        let _ = t.send(Cmd::PlayNextResult(i.max(0) as usize));
+    });
+    let t = tx.clone();
+    ui.on_play_next_playlist_track(move |i| {
+        let _ = t.send(Cmd::PlayNextPlaylistTrack(i.max(0) as usize));
+    });
+    let t = tx.clone();
+    ui.on_play_next_queue(move |i| {
+        let _ = t.send(Cmd::PlayNextQueue(i.max(0) as usize));
+    });
+    let t = tx.clone();
+    ui.on_open_track_web(move |id| {
+        let _ = t.send(Cmd::OpenTrackWeb(id.to_string()));
     });
     let t = tx.clone();
     ui.on_open_artist(move |id| {
@@ -242,7 +304,11 @@ fn main() -> Result<(), slint::PlatformError> {
 
     // closing the window hides it to the tray; "Quit" in the tray menu ends the app
     let t = tx.clone();
+    let weak_ui = ui.as_weak();
     ui.window().on_close_requested(move || {
+        if let Some(ui) = weak_ui.upgrade() {
+            save_window(&ui);
+        }
         let _ = t.send(Cmd::Visible(false));
         slint::CloseRequestResponse::HideWindow
     });
@@ -254,5 +320,23 @@ fn main() -> Result<(), slint::PlatformError> {
     std::thread::spawn(move || engine::run(rx, tx, weak, vendor, cache));
 
     ui.show()?;
-    slint::run_event_loop_until_quit()
+    let result = slint::run_event_loop_until_quit();
+    // Quit from the tray menu ends the loop without a close request
+    save_window(&ui);
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_window;
+
+    #[test]
+    fn the_saved_window_is_read_back_and_nonsense_is_ignored() {
+        assert_eq!(parse_window("996 659 1\n"), Some((996, 659, 1)));
+        assert_eq!(parse_window("1200 800"), Some((1200, 800, 0)), "a file from before tabs were saved");
+        assert_eq!(parse_window("1200 800 9"), Some((1200, 800, 3)), "an unknown tab is clamped");
+        for bad in ["", "abc", "100 100 0", "99999 800 0", "800 -5 0", "800"] {
+            assert_eq!(parse_window(bad), None, "{bad:?}");
+        }
+    }
 }
