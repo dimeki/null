@@ -797,6 +797,8 @@ impl Engine {
                     // the UI was idle while hidden, so bring it fully up to date
                     self.sync();
                     self.push_progress();
+                    // and redraw all of it: what the window last drew may be gone
+                    let _ = self.ui.upgrade_in_event_loop(|ui| ui.set_repaint_nonce(ui.get_repaint_nonce().wrapping_add(1)));
                 } else {
                     self.trim_at = Some(Instant::now() + Duration::from_millis(500));
                 }

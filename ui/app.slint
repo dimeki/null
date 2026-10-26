@@ -801,7 +801,11 @@ export component MainWindow inherits Window {
     min-height: 460px;
     preferred-width: 980px;
     preferred-height: 620px;
-    background: Theme.bg;
+    // Changing this by a hair makes the whole window repaint. Windows can throw away what a
+    // window last drew (after sleep or a long idle), and the app only redraws what changed.
+    in property <int> repaint-nonce;
+    // (two opaque colours a shade apart: anything see-through would make Windows blend the window)
+    background: Math.mod(root.repaint-nonce, 2) == 0 ? Theme.bg : Theme.bg.darker(0.02);
     default-font-size: 13px;
 
     in-out property <string> query;

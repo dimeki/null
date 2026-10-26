@@ -319,6 +319,21 @@ fn main() -> Result<(), slint::PlatformError> {
     let weak = ui.as_weak();
     std::thread::spawn(move || engine::run(rx, tx, weak, vendor, cache));
 
+    // Windows can discard what the window last drew (long idle, sleep, display off), and the
+    // app only redraws what changed, so hovering would bring the window back piece by piece.
+    // A full redraw every couple of seconds while it is on screen repairs that quickly.
+    let repaint = slint::Timer::default();
+    let weak_ui = ui.as_weak();
+    let mut ticks = 0i32;
+    repaint.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(2), move || {
+        let Some(ui) = weak_ui.upgrade() else { return };
+        ticks = ticks.wrapping_add(1);
+        // performance saving trades a slower repair for less work
+        if ui.window().is_visible() && (!ui.get_perf_mode() || ticks % 3 == 0) {
+            ui.set_repaint_nonce(ui.get_repaint_nonce().wrapping_add(1));
+        }
+    });
+
     ui.show()?;
     let result = slint::run_event_loop_until_quit();
     // Quit from the tray menu ends the loop without a close request
