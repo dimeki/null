@@ -4,6 +4,8 @@
 mod config;
 mod cookies;
 mod engine;
+#[cfg(feature = "gallery")]
+mod gallery;
 mod innertube;
 mod login;
 mod lyrics;
@@ -71,6 +73,12 @@ fn save_window(ui: &MainWindow) {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    // developer tool: screenshots of every screen, no engine and no window
+    #[cfg(feature = "gallery")]
+    if let Some(out) = gallery::requested() {
+        return gallery::run(out);
+    }
+
     let ui = MainWindow::new()?;
     let (tx, rx) = mpsc::channel::<Cmd>();
 

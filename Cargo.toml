@@ -35,3 +35,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[features]
+# developer tool: `cargo run --release --features gallery -- --gallery <folder>` writes screenshots of every screen
+gallery = []

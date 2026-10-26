@@ -1,0 +1,23 @@
+# Working on the interface
+
+The interface is in `ui/`:
+
+- `theme.slint`: colours (`Theme`), the icon shapes, and the data types the Rust code fills in
+- `components.slint`: the reusable pieces (rows, buttons, toggles, scroll list, seek bar)
+- `app.slint`: the sign-in window and the main window with all its screens
+
+## See every screen at once
+
+```
+cargo run --release --features gallery -- --gallery gallery
+```
+
+This fills the window with made-up data and writes a PNG of every screen, in dark and light,
+into `gallery\`, plus `gallery\index.html` to look at them together. It draws into memory:
+no window opens and nothing is clicked. The scenes are in `src/gallery.rs`; add a screen or
+a state there when you add one to the app. The feature is off in normal builds, so none of
+this ships in the released program.
+
+## Colour scheme
+
+`Theme.scheme` is 0 to follow Windows, 1 for always dark, 2 for always light.
