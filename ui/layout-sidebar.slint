@@ -1,31 +1,43 @@
 import { Theme } from "theme.slint";
 import { SideNav } from "chrome-sidebar.slint";
 import { PlayerBarCentered } from "chrome-player-centered.slint";
+import { PlayerPill } from "chrome-pill.slint";
 import { ScreenHost } from "screen-host.slint";
 
-/// Navigation down the left, screens beside it (the queue is a screen of its own), the player along the bottom
-export component LayoutSidebar inherits VerticalLayout {
-    HorizontalLayout {
-        SideNav {
-            min-width: 176px;
-            max-width: 176px;
-        }
-        Rectangle {
-            width: 1px;
-            background: Theme.border;
-        }
-        VerticalLayout {
-            padding: 16px;
-            spacing: 10px;
-            horizontal-stretch: 1;
-            ScreenHost {
-                vertical-stretch: 1;
+/// Navigation down the left, screens beside it (the queue is a screen of its own). The player
+/// is a bar along the bottom, or (Theme.floating-player) a small pill floating over the screens.
+export component LayoutSidebar inherits Rectangle {
+    VerticalLayout {
+        HorizontalLayout {
+            SideNav {
+                min-width: 176px;
+                max-width: 176px;
+            }
+            Rectangle {
+                width: 1px;
+                background: Theme.border;
+            }
+            VerticalLayout {
+                padding: 16px;
+                // room for the pill to float over
+                padding-bottom: Theme.floating-player ? 106px : 16px;
+                spacing: 10px;
+                horizontal-stretch: 1;
+                ScreenHost {
+                    vertical-stretch: 1;
+                }
             }
         }
+        if !Theme.floating-player: Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+        if !Theme.floating-player: PlayerBarCentered { }
     }
-    Rectangle {
-        height: 1px;
-        background: Theme.border;
+    if Theme.floating-player: PlayerPill {
+        // centred over the screens, to the right of the sidebar
+        width: Math.min(parent.width - 177px - 40px, 520px);
+        x: 177px + (parent.width - 177px - self.width) / 2;
+        y: parent.height - self.height - 16px;
     }
-    PlayerBarCentered { }
 }

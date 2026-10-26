@@ -134,6 +134,34 @@ export component PlayerPill inherits Rectangle {
                 horizontal-alignment: right;
                 min-width: 32px;
             }
+            // volume
+            HorizontalLayout {
+                spacing: 5px;
+                min-width: 108px;
+                max-width: 108px;
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        glyph: Glyphs.volume;
+                        tint: Theme.text3;
+                        width: 15px;
+                        height: 15px;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    volume-bar := Scrub {
+                        value: AppState.volume;
+                        live: true;
+                        bubble: "\{Math.round(volume-bar.hover-fraction * 100)}%";
+                        committed(f) => {
+                            AppState.volume = f;
+                            AppState.set-volume(f);
+                        }
+                    }
+                }
+            }
         }
     }
 }

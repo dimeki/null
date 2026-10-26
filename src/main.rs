@@ -139,6 +139,10 @@ fn main() -> Result<(), slint::PlatformError> {
         let _ = t.send(Cmd::SeekFraction(f));
     });
     let t = tx.clone();
+    ui.global::<AppState>().on_set_floating_player(move |on| {
+        let _ = t.send(Cmd::SetFloatingPlayer(on));
+    });
+    let t = tx.clone();
     ui.global::<AppState>().on_set_layout(move |i| {
         let _ = t.send(Cmd::SetLayout(i));
     });

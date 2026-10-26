@@ -310,8 +310,9 @@ pub fn run(out: PathBuf) -> Result<(), slint::PlatformError> {
 
     // (section heading, caption, file name)
     let mut shots: Vec<(String, String, String)> = Vec::new();
-    for (layout, layout_name) in [(0, "tabs"), (1, "sidebar"), (2, "art"), (3, "compact")] {
+    for (layout, floating, layout_name) in [(0, false, "tabs"), (1, false, "sidebar"), (1, true, "sidebar-pill"), (2, false, "art"), (3, false, "compact")] {
         ui.global::<Theme>().set_layout(layout);
+        ui.global::<Theme>().set_floating_player(floating);
         for (palette, scheme_name) in [(1, "dark"), (2, "light"), (3, "slate"), (4, "ember"), (5, "paper"), (6, "black")] {
             ui.global::<Theme>().set_palette(palette);
             for (n, (name, setup)) in scenes().iter().enumerate() {

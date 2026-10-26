@@ -26,6 +26,8 @@ pub struct Saved {
     pub theme: i32,
     /// Layout: 0 tabs along the top, 1 a sidebar, 2 art first
     pub layout: i32,
+    /// Sidebar layout only: the player floats as a pill instead of sitting in a bar
+    pub floating_player: bool,
 }
 
 pub fn save(path: &Path, s: &Saved) -> std::io::Result<()> {
@@ -45,6 +47,7 @@ pub fn save(path: &Path, s: &Saved) -> std::io::Result<()> {
     out.push_str(&format!("update_check={}\n", s.auto_update_check as u8));
     out.push_str(&format!("theme={}\n", s.theme));
     out.push_str(&format!("layout={}\n", s.layout));
+    out.push_str(&format!("floating_player={}\n", s.floating_player as u8));
     for t in &s.queue {
         out.push_str(&format!(
             "track\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -81,6 +84,7 @@ pub fn load(path: &Path) -> Option<Saved> {
         auto_update_check: true,
         theme: 0,
         layout: 0,
+        floating_player: false,
     };
     for line in lines {
         if let Some(rest) = line.strip_prefix("track\t") {
@@ -113,6 +117,7 @@ pub fn load(path: &Path) -> Option<Saved> {
                 "update_check" => s.auto_update_check = v != "0",
                 "theme" => s.theme = v.trim().parse().unwrap_or(0).clamp(0, 6),
                 "layout" => s.layout = v.trim().parse().unwrap_or(0).clamp(0, 3),
+                "floating_player" => s.floating_player = v.trim() == "1",
                 _ => {}
             }
         }

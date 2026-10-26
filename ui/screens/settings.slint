@@ -189,6 +189,43 @@ export component ScreenSettings inherits Rectangle {
             }
         }
     }
+    if Theme.layout == 1: Rectangle {
+        height: 64px;
+        border-radius: 8px;
+        background: fp-ta.has-hover ? Theme.hover : transparent;
+        fp-ta := TouchArea { }
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: "Floating player";
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: Theme.text;
+                }
+                Text {
+                    text: "A small player floating over the bottom of the screen, instead of a bar";
+                    font-size: 12px;
+                    color: Theme.text2;
+                    overflow: elide;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Toggle {
+                    checked: Theme.floating-player;
+                    toggled(on) => {
+                        Theme.floating-player = on;
+                        AppState.set-floating-player(on);
+                    }
+                }
+            }
+        }
+    }
     Rectangle {
         height: 64px;
         border-radius: 8px;

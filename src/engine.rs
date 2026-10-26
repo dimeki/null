@@ -127,6 +127,8 @@ pub enum Cmd {
     SetTheme(i32),
     /// The user picked a layout (0 tabs, 1 sidebar, 2 art first)
     SetLayout(i32),
+    /// The user switched the floating player on or off (sidebar layout)
+    SetFloatingPlayer(bool),
 }
 
 struct ArtistView {
@@ -322,6 +324,8 @@ struct Engine {
     theme: i32,
     /// Layout: 0 tabs along the top, 1 a sidebar, 2 art first
     layout: i32,
+    /// Sidebar layout only: the player floats as a pill
+    floating_player: bool,
     /// When the next automatic check is due (none while automatic checks are off)
     next_update_check: Option<Instant>,
 }
@@ -418,6 +422,7 @@ pub fn run(rx: Receiver<Cmd>, tx: Sender<Cmd>, ui: Weak<MainWindow>, vendor: Pat
         auto_update: true,
         theme: 0,
         layout: 0,
+        floating_player: false,
         next_update_check: None,
     };
     eng.load_stored_auth();
@@ -664,6 +669,10 @@ impl Engine {
                 if let Some(release) = &self.update {
                     let _ = webbrowser::open(&release.url);
                 }
+            }
+            Cmd::SetFloatingPlayer(on) => {
+                self.floating_player = on;
+                self.dirty.set(true);
             }
             Cmd::SetLayout(layout) => {
                 self.layout = layout.clamp(0, 3);
@@ -2125,10 +2134,12 @@ impl Engine {
         self.theme = saved.theme;
         let theme = saved.theme;
         self.layout = saved.layout;
-        let layout = saved.layout;
+        self.floating_player = saved.floating_player;
+        let (layout, floating) = (saved.layout, saved.floating_player);
         let _ = self.ui.upgrade_in_event_loop(move |ui| {
             ui.global::<Theme>().set_palette(theme);
             ui.global::<Theme>().set_layout(layout);
+            ui.global::<Theme>().set_floating_player(floating);
         });
         if !saved.display_name.is_empty() {
             self.display_name = saved.display_name;
@@ -2177,6 +2188,7 @@ impl Engine {
             auto_update_check: self.auto_update,
             theme: self.theme,
             layout: self.layout,
+            floating_player: self.floating_player,
         };
         let _ = crate::state::save(&self.state_path, &saved);
         self.last_save = Instant::now();

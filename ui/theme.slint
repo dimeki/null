@@ -55,6 +55,8 @@ export global Theme {
     /// 0 is tabs along the top, 1 a sidebar, 2 the cover and player in a left column, 3 compact with a floating player
     in-out property <int> layout: 0;
     out property <[string]> layout-names: ["Tabs", "Sidebar", "Art first", "Compact"];
+    /// In the sidebar layout: show the player as a floating pill instead of a bar
+    in-out property <bool> floating-player: false;
     property <int> p: palette == 0 ? (Palette.color-scheme == ColorScheme.dark ? 1 : 2) : palette;
     out property <[Colors]> palettes: [
         // 1 Dark
