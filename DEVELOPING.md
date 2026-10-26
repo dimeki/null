@@ -8,7 +8,7 @@ Everything is in `ui/`:
 - `screens/*.slint`: one file per screen (search, library, playlist, artist, lyrics, party, settings, sign-in)
 - `chrome-*.slint`: the parts around the screens (tab bar, sidebar, queue, player bar, update notice)
 - `screen-host.slint`: picks which screen to show. Every layout puts it where its content goes
-- `layout-*.slint`: how it is all arranged: `layout-tabs.slint` is the original, `layout-sidebar.slint` has a sidebar and a centred player bar, `layout-art.slint` puts a big cover and the player in a left column
+- `layout-*.slint`: how it is all arranged: `layout-tabs.slint` is the original, `layout-sidebar.slint` has a sidebar and a centred player bar, `layout-art.slint` puts a big cover and the player in a left column, `layout-compact.slint` has a segmented header and a floating player pill
 - `app.slint`: the two windows and the keyboard shortcuts
 
 ## Adding a layout

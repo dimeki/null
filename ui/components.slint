@@ -847,3 +847,30 @@ export component PillTab inherits Rectangle {
         }
     }
 }
+
+/// One segment of the compact layout's segmented control
+export component SegTab inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked();
+    min-width: seg-text.preferred-width + 28px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: root.active ? Theme.border-strong : transparent;
+    background: root.active ? Theme.surface : (seg-ta.has-hover ? Theme.hover : transparent);
+    animate background { duration: Theme.fade; }
+    seg-text := Text {
+        text: root.label;
+        font-size: 13px;
+        font-weight: root.active ? 500 : 400;
+        color: root.active ? Theme.text : Theme.text2;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    seg-ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}

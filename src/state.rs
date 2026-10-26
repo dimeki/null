@@ -112,7 +112,7 @@ pub fn load(path: &Path) -> Option<Saved> {
                 "name" => s.display_name = v.trim().to_string(),
                 "update_check" => s.auto_update_check = v != "0",
                 "theme" => s.theme = v.trim().parse().unwrap_or(0).clamp(0, 6),
-                "layout" => s.layout = v.trim().parse().unwrap_or(0).clamp(0, 2),
+                "layout" => s.layout = v.trim().parse().unwrap_or(0).clamp(0, 3),
                 _ => {}
             }
         }

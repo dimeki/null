@@ -1,0 +1,139 @@
+import { Theme, Glyphs } from "theme.slint";
+import { Icon, IconButton, Scrub, CreditLine } from "components.slint";
+import { AppState } from "state.slint";
+
+/// A compact player that floats over the bottom of the screens (the compact layout)
+export component PlayerPill inherits Rectangle {
+    height: 82px;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.border-strong;
+    background: Theme.surface;
+    VerticalLayout {
+        padding-left: 12px;
+        padding-right: 14px;
+        padding-top: 9px;
+        padding-bottom: 6px;
+        spacing: 2px;
+        HorizontalLayout {
+            spacing: 11px;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    min-width: 42px;
+                    max-width: 42px;
+                    min-height: 42px;
+                    max-height: 42px;
+                    border-radius: 6px;
+                    background: Theme.accent-bg;
+                    clip: true;
+                    if AppState.now-cover.width > 0 && !Theme.perf: Image {
+                        source: AppState.now-cover;
+                        width: parent.width;
+                        height: parent.height;
+                    }
+                    if AppState.now-cover.width == 0 || Theme.perf: Icon {
+                        glyph: Glyphs.music;
+                        tint: Theme.accent;
+                        width: 20px;
+                        height: 20px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Text {
+                    text: AppState.now-title;
+                    color: Theme.text;
+                    font-size: 13px;
+                    font-weight: 500;
+                    overflow: elide;
+                }
+                if AppState.now-artist-id == "": Text {
+                    text: AppState.now-detail;
+                    color: Theme.text2;
+                    font-size: 12px;
+                    overflow: elide;
+                }
+                if AppState.now-artist-id != "": CreditLine {
+                    text: AppState.now-detail;
+                    artist: AppState.now-artist;
+                    rest: AppState.now-rest;
+                    artist-id: AppState.now-artist-id;
+                    artist-clicked(id) => {
+                        AppState.open-artist(id);
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: Glyphs.prev;
+                    tip: "Previous (Ctrl+Left)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.prev();
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: (AppState.active && !AppState.paused) ? Glyphs.pause : Glyphs.play;
+                    size: 38px;
+                    solid: true;
+                    tip: (AppState.active && !AppState.paused) ? "Pause (Space)" : "Play (Space)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.toggle-pause();
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                IconButton {
+                    glyph: Glyphs.next;
+                    tip: "Next (Ctrl+Right)";
+                    enabled: !AppState.controls-locked;
+                    clicked => {
+                        AppState.next();
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            height: 22px;
+            spacing: 8px;
+            Text {
+                text: AppState.pos-text;
+                color: Theme.text3;
+                font-size: 11px;
+                vertical-alignment: center;
+                min-width: 32px;
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                seek-bar := Scrub {
+                    value: Math.min(Math.max(AppState.progress, 0), 1);
+                    enabled: !AppState.controls-locked;
+                    bubble: AppState.duration-secs > 0 ? AppState.clock(seek-bar.hover-fraction * AppState.duration-secs) : "";
+                    committed(f) => {
+                        AppState.seek(f);
+                    }
+                }
+            }
+            Text {
+                text: AppState.dur-text;
+                color: Theme.text3;
+                font-size: 11px;
+                vertical-alignment: center;
+                horizontal-alignment: right;
+                min-width: 32px;
+            }
+        }
+    }
+}

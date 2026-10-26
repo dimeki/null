@@ -62,7 +62,7 @@ fn parse_window(text: &str) -> Option<(u32, u32, i32)> {
     let w: u32 = parts.next()?.parse().ok()?;
     let h: u32 = parts.next()?.parse().ok()?;
     let tab: i32 = parts.next().and_then(|t| t.parse().ok()).unwrap_or(0);
-    ((600..=7680).contains(&w) && (400..=4320).contains(&h)).then_some((w, h, tab.clamp(0, 3)))
+    ((600..=7680).contains(&w) && (400..=4320).contains(&h)).then_some((w, h, tab.clamp(0, 4)))
 }
 
 fn save_window(ui: &MainWindow) {
@@ -367,7 +367,7 @@ mod tests {
     fn the_saved_window_is_read_back_and_nonsense_is_ignored() {
         assert_eq!(parse_window("996 659 1\n"), Some((996, 659, 1)));
         assert_eq!(parse_window("1200 800"), Some((1200, 800, 0)), "a file from before tabs were saved");
-        assert_eq!(parse_window("1200 800 9"), Some((1200, 800, 3)), "an unknown tab is clamped");
+        assert_eq!(parse_window("1200 800 9"), Some((1200, 800, 4)), "an unknown tab is clamped");
         for bad in ["", "abc", "100 100 0", "99999 800 0", "800 -5 0", "800"] {
             assert_eq!(parse_window(bad), None, "{bad:?}");
         }

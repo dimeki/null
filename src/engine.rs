@@ -666,7 +666,7 @@ impl Engine {
                 }
             }
             Cmd::SetLayout(layout) => {
-                self.layout = layout.clamp(0, 2);
+                self.layout = layout.clamp(0, 3);
                 self.dirty.set(true);
             }
             Cmd::SetTheme(theme) => {

@@ -1,0 +1,25 @@
+import { Theme } from "theme.slint";
+import { HeaderCompact } from "chrome-header-compact.slint";
+import { PlayerPill } from "chrome-pill.slint";
+import { ScreenHost } from "screen-host.slint";
+
+/// Quiet and compact: a segmented header, the screens, and a player pill floating over the bottom
+export component LayoutCompact inherits Rectangle {
+    VerticalLayout {
+        padding-left: 18px;
+        padding-right: 18px;
+        padding-top: 14px;
+        // room for the pill to float over
+        padding-bottom: 106px;
+        spacing: 12px;
+        HeaderCompact { }
+        ScreenHost {
+            vertical-stretch: 1;
+        }
+    }
+    PlayerPill {
+        width: Math.min(parent.width - 40px, 520px);
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 16px;
+    }
+}
